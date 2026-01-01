@@ -227,7 +227,7 @@ export async function renderSignature({ elements }) {
             x: qrField?.position?.x,
             y: qrField?.position?.y,
             size: QR_SIZE,
-            value: qrField.link || "Invalid Link !",
+            value: qrField.link || "Link Missing !",
             fgColor: "#000",
             bgColor: "#fff"
         });

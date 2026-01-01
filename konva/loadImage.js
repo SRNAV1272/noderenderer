@@ -3,8 +3,6 @@ import { Image } from "canvas";
 export async function loadImage(url) {
     if (!url) return null;
 
-    console.log("🖼️ loadImage:", url);
-
     /* --------------------------------------------------
        ✅ CASE 1: Base64 image (BEST)
     -------------------------------------------------- */

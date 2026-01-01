@@ -10,19 +10,19 @@ ENV NODE_ENV=production
 
 # Native build deps for canvas + sharp
 RUN apk add --no-cache \
-  python3 \
-  make \
-  g++ \
-  cairo-dev \
-  pango-dev \
-  pixman-dev \
-  freetype-dev \
-  harfbuzz-dev \
-  fribidi-dev \
-  libpng-dev \
-  jpeg-dev \
-  vips-dev \
-  glib-dev
+    python3 \
+    make \
+    g++ \
+    cairo-dev \
+    pango-dev \
+    pixman-dev \
+    freetype-dev \
+    harfbuzz-dev \
+    fribidi-dev \
+    libpng-dev \
+    jpeg-dev \
+    vips-dev \
+    glib-dev
 
 # Copy package files first
 COPY package.json package-lock.json ./
@@ -41,19 +41,40 @@ FROM node:18-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 
+# -------- ENV PATCH (runtime-safe) --------
+ARG CORS_ORIGIN
+ARG API_URL
+ARG AUTH_TOKEN
+ARG AES_KEY
+ARG AES_IV
+ARG adminusername
+ARG username
+ARG orgid
+
+ENV CORS_ORIGIN=${CORS_ORIGIN}
+ENV API_URL=${API_URL}
+ENV AUTH_TOKEN=${AUTH_TOKEN}
+ENV AES_KEY=${AES_KEY}
+ENV AES_IV=${AES_IV}
+ENV adminusername=${adminusername}
+ENV username=${username}
+ENV orgid=${orgid}
+# ------------------------------------------
+
+
 # Runtime libs only (NO -dev packages)
 RUN apk add --no-cache \
-  cairo \
-  pango \
-  pixman \
-  freetype \
-  harfbuzz \
-  fribidi \
-  libpng \
-  jpeg \
-  vips \
-  glib \
-  libc6-compat
+    cairo \
+    pango \
+    pixman \
+    freetype \
+    harfbuzz \
+    fribidi \
+    libpng \
+    jpeg \
+    vips \
+    glib \
+    libc6-compat
 
 # Non-root user
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup

@@ -11,38 +11,6 @@ const __dirname = path.dirname(__filename);
 
 const FONT_DIR = path.join(__dirname, "Fonts");
 
-// function registerAllFonts(dir) {
-//     if (!fs.existsSync(dir)) {
-//         console.warn("⚠️ Font directory not found:", dir);
-//         return;
-//     }
-
-//     const files = fs.readdirSync(dir);
-
-//     files.forEach((file) => {
-//         if (!file.toLowerCase().endsWith(".ttf")) return;
-
-//         const fontPath = path.join(dir, file);
-
-//         const family = file
-//             .replace(".ttf", "")
-//             .replace(/_/g, " ")
-//             .replace(/\b\w/g, (c) => c.toUpperCase());
-
-//         try {
-//             registerFont(fontPath, {
-//                 family,
-//                 weight: "normal",
-//                 style: "normal"
-//             });
-
-//             console.log("✅ Registered font:", family);
-//         } catch (err) {
-//             console.warn("⚠️ Skipped invalid font:", file);
-//         }
-//     });
-// }
-
 function parseFontMeta(fileName) {
     const name = fileName.toLowerCase();
 
