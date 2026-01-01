@@ -123,7 +123,13 @@ export const updateFieldsFromCard = (card, BASE_URL) => (prevFields) => {
         if (field.key === "state") return { ...field, value: card.address?.state ?? "" };
         if (field.key === "country") return { ...field, value: card.address?.country ?? "" };
         if (field.key === "pincode") return { ...field, value: card.address?.pinCode ?? "" };
-
+        if (field.key === "qrCode") {
+            return {
+                ...field,
+                link: card?.shareLink ?? "",
+                show: field.show,
+            };
+        }
         // ==========================
         // ✅ SOCIAL LINKS (MULTI YOUTUBE SAFE)
         // ==========================

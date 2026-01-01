@@ -103,7 +103,6 @@ export async function renderSignature({ elements }) {
 
     const bgColor = elements.find(e => e.key === "backgroundColor");
     const bgImage = elements.find(e => e.key === "backgroundImage" && e.show);
-    console.log(bgColor)
     if (bgImage?.link || bgImage?.value) {
         const img = await loadImage(bgImage.link || bgImage.value);
         if (img) {
@@ -222,17 +221,13 @@ export async function renderSignature({ elements }) {
     //     imageLayer.add(qrGroup);
     // }
     const qrField = elements.find(e => e.key === "qrCode" && e.show);
-    if (qrField && (qrField.value || qrField.link)) {
+    if (qrField) {
         const QR_SIZE = 80;
-        const QR_PADDING = 12;
-        const qrX = stageWidth - QR_SIZE - QR_PADDING;
-        const qrY = stageHeight - QR_SIZE - QR_PADDING;
-
         const qrGroup = await renderQRCode({
             x: qrField?.position?.x,
             y: qrField?.position?.y,
             size: QR_SIZE,
-            value: qrField.link || qrField.value,
+            value: qrField.link || "Invalid Link !",
             fgColor: "#000",
             bgColor: "#fff"
         });
