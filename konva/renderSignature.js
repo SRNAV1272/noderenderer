@@ -3,10 +3,9 @@ import sharp from "sharp";
 import { renderIcon } from "./icons/index.js";
 import { loadImage } from "./loadImage.js";
 import { renderQRCode } from "./qr/renderQrCode.js";
-// import QRCode from "qrcode";
 
 /* --------------------------------
-   Helpers (React parity)
+   Helpers
 -------------------------------- */
 
 function resolveAlign(field) {
@@ -15,8 +14,9 @@ function resolveAlign(field) {
 }
 
 function resolveFontStyle(field) {
-    console.log(`${field.fontWeight} ${field.fontStyle}`)
-    return `${900} ${field.fontStyle}`.trim() || "normal";
+    const weight = field.fontWeight || 400;
+    const style = field.fontStyle || "normal";
+    return `${weight} ${style}`.trim();
 }
 
 function getGroupedText(allFields, options, key) {
@@ -34,176 +34,33 @@ function getGroupedText(allFields, options, key) {
             return f?.show ? f.value : "";
         })
         .filter(Boolean)
-        .join(`${parent.separator || ", "} `);
+        .join(parent.separator || ", ");
 }
 
 /* --------------------------------
-   QR Renderer (styled)
+   MAIN RENDERER
 -------------------------------- */
 
-// async function renderQRCode({
-//     x,
-//     y,
-//     size,
-//     value,
-//     logoUrl,
-//     fgColor = "#000",
-//     bgColor = "#fff"
-// }) {
-//     const qr = QRCode.create(value, {
-//         errorCorrectionLevel: "H"
-//     });
+export async function renderSignature({ elements }) {
 
-//     const cells = qr.modules.data;
-//     const count = qr.modules.size;
-//     const cellSize = size / count;
-
-//     const group = new Konva.Group({ x, y, listening: false });
-
-//     // background
-//     group.add(
-//         new Konva.Rect({
-//             x: 0,
-//             y: 0,
-//             width: size,
-//             height: size,
-//             fill: bgColor,
-//             listening: false
-//         })
-//     );
-
-//     // dots
-//     for (let r = 0; r < count; r++) {
-//         for (let c = 0; c < count; c++) {
-//             const idx = r * count + c;
-//             if (!cells[idx]) continue;
-
-//             const isEye =
-//                 (r < 7 && c < 7) ||
-//                 (r < 7 && c > count - 8) ||
-//                 (r > count - 8 && c < 7);
-
-//             if (isEye) continue;
-
-//             group.add(
-//                 new Konva.Circle({
-//                     x: c * cellSize + cellSize / 2,
-//                     y: r * cellSize + cellSize / 2,
-//                     radius: cellSize * 0.22,
-//                     fill: fgColor,
-//                     listening: false
-//                 })
-//             );
-//         }
-//     }
-
-//     // eyes
-//     function drawEye(ex, ey) {
-//         group.add(
-//             new Konva.Rect({
-//                 x: ex,
-//                 y: ey,
-//                 width: cellSize * 7,
-//                 height: cellSize * 7,
-//                 cornerRadius: 6,
-//                 fill: fgColor,
-//                 listening: false
-//             })
-//         );
-
-//         group.add(
-//             new Konva.Rect({
-//                 x: ex + cellSize,
-//                 y: ey + cellSize,
-//                 width: cellSize * 5,
-//                 height: cellSize * 5,
-//                 cornerRadius: 6,
-//                 fill: bgColor,
-//                 listening: false
-//             })
-//         );
-
-//         group.add(
-//             new Konva.Rect({
-//                 x: ex + cellSize * 2,
-//                 y: ey + cellSize * 2,
-//                 width: cellSize * 3,
-//                 height: cellSize * 3,
-//                 cornerRadius: 6,
-//                 fill: fgColor,
-//                 listening: false
-//             })
-//         );
-//     }
-
-//     drawEye(0, 0);
-//     drawEye((count - 7) * cellSize, 0);
-//     drawEye(0, (count - 7) * cellSize);
-
-//     // center logo
-//     if (logoUrl) {
-//         const logo = await loadImage(logoUrl);
-//         if (logo) {
-//             const logoSize = size * 0.28;
-//             const pad = logoSize * 0.15;
-
-//             group.add(
-//                 new Konva.Rect({
-//                     x: (size - logoSize) / 2 - pad,
-//                     y: (size - logoSize) / 2 - pad,
-//                     width: logoSize + pad * 2,
-//                     height: logoSize + pad * 2,
-//                     fill: bgColor,
-//                     cornerRadius: 8,
-//                     listening: false
-//                 })
-//             );
-
-//             group.add(
-//                 new Konva.Image({
-//                     image: logo,
-//                     x: (size - logoSize) / 2,
-//                     y: (size - logoSize) / 2,
-//                     width: logoSize,
-//                     height: logoSize,
-//                     listening: false
-//                 })
-//             );
-//         }
-//     }
-
-//     return group;
-// }
-
-/* --------------------------------
-   Main Renderer
--------------------------------- */
-
-export async function renderSignature({
-    elements,
-    // options,
-    // stageWidth = 336,
-    // stageHeight = 192
-}) {
     const BASE_WIDTH = 336;
+    const SCALE = 3;
 
-    const signatureMeta = elements?.find(
-        (el) => el.key === "signatureName"
-    );
+    const signatureMeta = elements.find(el => el.key === "signatureName");
 
-    const ratioValue =
+    const ratio =
         signatureMeta?.width && signatureMeta?.height
             ? signatureMeta.width / signatureMeta.height
-            : 7 / 4; // fallback
+            : 7 / 4;
 
-    const baseWidth = BASE_WIDTH;
-    const baseHeight = Math.round(BASE_WIDTH / ratioValue);
+    const stageWidth = BASE_WIDTH;
+    const stageHeight = Math.round(BASE_WIDTH / ratio);
 
-    const stageWidth = baseWidth
-    const stageHeight = baseHeight
-    const SCALE = 3; // 🔥 2 = good, 3 = very sharp
     const options = {
         fullName: ["prefix", "firstName", "lastName"],
+        website: ["website"],
+        companyName: ["companyName"],
+        designation: ["designation"],
         email: ["email", "email1", "email2"],
         mobileNumber: ["mobileNumber", "mobileNumber1", "mobileNumber2"],
         landlineNumber: ["landlineNumber", "landlineNumber1", "landlineNumber2"],
@@ -214,9 +71,13 @@ export async function renderSignature({
             "city",
             "state",
             "country",
-            "pincode",
+            "pincode"
         ],
     };
+
+    /* --------------------------------
+       STAGE + LAYERS (FIXED ORDER)
+    -------------------------------- */
 
     const stage = new Konva.Stage({
         width: stageWidth * SCALE,
@@ -226,123 +87,87 @@ export async function renderSignature({
         listening: false
     });
 
-    const layer = new Konva.Layer();
-    stage.add(layer);
+    const backgroundLayer = new Konva.Layer({ listening: false }); // bottom
+    const shapeLayer = new Konva.Layer({ listening: false });
+    const imageLayer = new Konva.Layer({ listening: false });
+    const textLayer = new Konva.Layer({ listening: false }); // top
 
-    /* ---------- BACKGROUND ---------- */
+    stage.add(backgroundLayer);
+    stage.add(shapeLayer);
+    stage.add(imageLayer);
+    stage.add(textLayer);
+
+    /* --------------------------------
+       BACKGROUND (ONLY HERE)
+    -------------------------------- */
+
     const bgColor = elements.find(e => e.key === "backgroundColor");
     const bgImage = elements.find(e => e.key === "backgroundImage" && e.show);
-
-    if (bgImage && (bgImage.link || bgImage.value)) {
+    console.log(bgColor)
+    if (bgImage?.link || bgImage?.value) {
         const img = await loadImage(bgImage.link || bgImage.value);
-
         if (img) {
-            layer.add(
+            backgroundLayer.add(
                 new Konva.Image({
                     image: img,
                     x: 0,
                     y: 0,
                     width: stageWidth,
                     height: stageHeight,
-                    listening: false,
-                    cornerRadius: 8
+                    cornerRadius: 8,
+                    listening: false
                 })
             );
         }
     } else {
-        layer.add(
+        backgroundLayer.add(
             new Konva.Rect({
                 x: 0,
                 y: 0,
                 width: stageWidth,
                 height: stageHeight,
-                fill: bgColor?.value || "#fff",
+                fill: bgColor?.value || "#ffffff",
                 cornerRadius: 8,
                 listening: false
             })
         );
     }
 
-    /* ---------- LOGO + PROFILE ---------- */
+    /* --------------------------------
+       SHAPES (ABOVE BACKGROUND)
+    -------------------------------- */
+
     for (const field of elements) {
-        if (!field.show || !field.position) continue;
-        if (!["logo", "profilePhoto"].includes(field.key)) continue;
+        if (!field.show || !field.shapeType) continue;
 
-        const img = await loadImage(field.link || field.value);
-        if (!img) continue;
-
-        layer.add(
-            new Konva.Image({
-                image: img,
-                x: field.position.x,
-                y: field.position.y,
-                width: field.width,
-                height: field.height,
-                cornerRadius: field.key === "profilePhoto" ? field.width / 2 : 0,
-                listening: false
-            })
-        );
-    }
-
-    /* ---------- QR CODE ---------- */
-    const qrField = elements.find(e => e.key === "qrCode" && e.show);
-    if (qrField?.position && (qrField.value || qrField.link)) {
-        const qrSize = Math.max(qrField.width, 96); // 👈 CRITICAL
-        const qrGroup = await renderQRCode({
-            x: qrField.position.x,
-            y: qrField.position.y,
-            size: qrField.width,
-            value: qrField.link || qrField.value,
-            fgColor: "#000",
-            bgColor: "#fff"
-        });
-
-        layer.add(qrGroup);
-
-    }
-
-    /* ---------- SHAPES ---------- */
-    for (const field of elements) {
-        if (!field.show || field.type !== "shape") continue;
-
-        const { shapeType, position } = field;
-        if (!position) continue;
-
-        if (shapeType === "circle") {
-            layer.add(
+        if (field.shapeType === "circle" && field.position) {
+            shapeLayer.add(
                 new Konva.Circle({
-                    x: position.x,
-                    y: position.y,
+                    x: field.position.x,
+                    y: field.position.y,
                     radius: field.radius || 10,
-                    fill: field.fill || "transparent",
-                    // stroke: field.stroke || "",
-                    // strokeWidth: field.strokeWidth || 0,
+                    fill: field.fill || "#ccc",
                     listening: false
                 })
             );
         }
 
-        if (shapeType === "rect") {
-            layer.add(
+        if (field.shapeType === "rect" && field.position) {
+            shapeLayer.add(
                 new Konva.Rect({
-                    x: position.x,
-                    y: position.y,
+                    x: field.position.x,
+                    y: field.position.y,
                     width: field.width,
                     height: field.height,
-                    fill: field.fill || "transparent",
-                    // stroke: field.stroke || "",
-                    // strokeWidth: field.strokeWidth || 0,
-                    // cornerRadius: field.radius || 0,
+                    fill: field.fill || "#f0c000",
                     listening: false
                 })
             );
         }
 
-        if (shapeType === "line" && Array.isArray(field.points)) {
-            layer.add(
+        if (field.shapeType === "line" && Array.isArray(field.points)) {
+            shapeLayer.add(
                 new Konva.Line({
-                    // x: position.x,
-                    // y: position.y,
                     points: field.points,
                     stroke: field.stroke || "#000",
                     strokeWidth: field.strokeWidth || 1,
@@ -354,11 +179,77 @@ export async function renderSignature({
         }
     }
 
-    /* ---------- TEXT + ICONS ---------- */
-    for (const field of elements) {
-        if (!field.show || !field.position || field?.key?.startsWith("social-")) continue;
+    /* --------------------------------
+       IMAGES (MIDDLE)
+    -------------------------------- */
 
+    for (const field of elements) {
+        if (!field.show || !field.position) continue;
+        if (!["logo", "profilePhoto"].includes(field.key)) continue;
+
+        const img = await loadImage(field.link || field.value);
+        if (!img) continue;
+
+        imageLayer.add(
+            new Konva.Image({
+                image: img,
+                x: field.position.x,
+                y: field.position.y,
+                width: field.width,
+                height: field.height,
+                cornerRadius:
+                    field.key === "profilePhoto" ? field.width / 2 : 0,
+                listening: false
+            })
+        );
+    }
+
+    /* --------------------------------
+       QR CODE
+    -------------------------------- */
+
+    // const qrField = elements.find(e => e.key === "qrCode" && e.show);
+    // if (qrField?.position && (qrField.value || qrField.link)) {
+    //     const qrGroup = await renderQRCode({
+    //         x: qrField.position.x,
+    //         y: qrField.position.y,
+    //         size: Math.max(qrField.width, 96),
+    //         value: qrField.link || qrField.value,
+    //         fgColor: "#000",
+    //         bgColor: "#fff"
+    //     });
+
+    //     imageLayer.add(qrGroup);
+    // }
+    const qrField = elements.find(e => e.key === "qrCode" && e.show);
+    if (qrField && (qrField.value || qrField.link)) {
+        const QR_SIZE = 80;
+        const QR_PADDING = 12;
+        const qrX = stageWidth - QR_SIZE - QR_PADDING;
+        const qrY = stageHeight - QR_SIZE - QR_PADDING;
+
+        const qrGroup = await renderQRCode({
+            x: qrField?.position?.x,
+            y: qrField?.position?.y,
+            size: QR_SIZE,
+            value: qrField.link || qrField.value,
+            fgColor: "#000",
+            bgColor: "#fff"
+        });
+
+        imageLayer.add(qrGroup);
+    }
+
+    /* --------------------------------
+       TEXT + ICONS (TOP)
+    -------------------------------- */
+
+    for (const field of elements) {
         if (
+            !field.show ||
+            !field.position ||
+            (!options?.[field?.key] && !field?.key?.startsWith("customText-")) ||
+            field.key?.startsWith("social-") ||
             [
                 "profilePhoto",
                 "logo",
@@ -371,20 +262,9 @@ export async function renderSignature({
             ].includes(field.key)
         ) continue;
 
-        // const displayText = options
-        //     ? getGroupedText(elements, options, field.key)
-        //     : field.value;
-
-        let displayText = "";
-
-        // ✅ If key exists in options mapping → grouped text
-        if (options && options[field.key]) {
-            displayText = getGroupedText(elements, options, field.key);
-        }
-        // ✅ Otherwise → direct value
-        else {
-            displayText = field.value;
-        }
+        const displayText = options[field.key]
+            ? getGroupedText(elements, options, field.key)
+            : field.value;
         if (!displayText) continue;
 
         const group = new Konva.Group({
@@ -393,8 +273,8 @@ export async function renderSignature({
             listening: false
         });
 
-        let iconSize = 0;
         let iconNode = null;
+        let iconSize = 0;
 
         if (field.label === "ICON") {
             iconSize = field.fontSize * 1.3;
@@ -405,21 +285,19 @@ export async function renderSignature({
                 size: iconSize,
                 color: field.color || "#000"
             });
-
             if (iconNode) group.add(iconNode);
         }
-        console.log(displayText)
+
         const textNode = new Konva.Text({
-            x: iconNode ? iconSize + 4 : 0,
+            x: iconNode ? iconSize + 1 : 0,
             y: 0,
-            text: displayText,
-            width: field.width * 1.12,
-            fontSize: field.fontSize,
-            // fontWeight: field?.fontWeight,
+            text: `${!!field.label && field.label !== "ICON" && !field?.key?.startsWith("customText-") ? field.label + " : " : ""} ${displayText}`,
+            width: field.width * 1.08,
+            fontSize: field.fontSize * 0.82,
             fontFamily: field.fontFamily || "Arial",
             fontStyle: resolveFontStyle(field),
             textDecoration: field.fontDecorationLine || "",
-            fill: field.color || "#000",
+            fill: field.color || "#fff",
             align: resolveAlign(field),
             wrap: "word",
             lineHeight: 1.1,
@@ -432,28 +310,22 @@ export async function renderSignature({
             iconNode.y((textNode.height() - iconSize) / 2);
         }
 
-        layer.add(group);
+        textLayer.add(group);
     }
 
-    /* ---------- EXPORT ---------- */
-    layer.draw();
+    /* --------------------------------
+       EXPORT
+    -------------------------------- */
+
+    backgroundLayer.draw();
+    shapeLayer.draw();
+    imageLayer.draw();
+    textLayer.draw();
+
     const canvas = stage.toCanvas({ pixelRatio: 1 });
     const buffer = canvas.toBuffer("image/png");
 
-    // return sharp(buffer).png({ compressionLevel: 9 }).toBuffer();
-    // return sharp(buffer)
-    //     .png({
-    //         compressionLevel: 9,
-    //         adaptiveFiltering: false
-    //     })
-    //     .resize(stageWidth, stageHeight, {
-    //         kernel: sharp.kernel.nearest   // 🔥 CRITICAL
-    //     })
-    //     .toBuffer();
     return sharp(buffer, { premultipliedAlpha: false })
-        .png({
-            compressionLevel: 9,
-            adaptiveFiltering: false
-        })
+        .png({ compressionLevel: 9, adaptiveFiltering: false })
         .toBuffer();
 }
