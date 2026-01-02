@@ -9,9 +9,8 @@ const crypto = webcrypto;
 const app = express();
 
 /* --------------------------------------------------
-   ✅ CORS (Express 5 compatible)
+   ✅ CORS
 -------------------------------------------------- */
-
 app.use(
     cors({
         origin: "*",
@@ -20,99 +19,98 @@ app.use(
     })
 );
 
-
 /* --------------------------------------------------
    Body parser
 -------------------------------------------------- */
 app.use(express.json({ limit: "10mb" }));
 
 /* --------------------------------------------------
-   Render endpoint
+   ENV (DO NOT CRASH POD)
 -------------------------------------------------- */
-
-
-/* ---------------------------------------------------------
-   Utilities
-   --------------------------------------------------------- */
-
-const API_URL =
-    process.env.API_URL ||
-    "";
-
+const API_URL = process.env.API_URL || "";
 const AES_KEY = process.env.AES_KEY;
 const AES_IV = process.env.AES_IV;
 
 if (!AES_KEY || !AES_IV) {
-    throw new Error("❌ Missing AES_KEY or AES_IV in environment variables");
+    console.error("❌ Missing AES_KEY or AES_IV (server running in degraded mode)");
 }
 
-function base64ToArrayBuffer(base64) {
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-        bytes[i] = binary.charCodeAt(i);
+/* --------------------------------------------------
+   Helpers
+-------------------------------------------------- */
+function base64ToArrayBuffer(base64 = "") {
+    try {
+        const binary = Buffer.from(base64, "base64");
+        return binary.buffer.slice(
+            binary.byteOffset,
+            binary.byteOffset + binary.byteLength
+        );
+    } catch {
+        return new ArrayBuffer(0);
     }
-    return bytes.buffer;
-}
-/* ---------------------------------------------------------
-   AES Decryption Helper (Outlook-safe)
-   --------------------------------------------------------- */
-
-function handleAesDecrypt(encryptedText, generatedKey) {
-    return new Promise(async (resolve) => {
-        try {
-            if (!encryptedText) {
-                resolve("");
-                return;
-            }
-
-            const keyBuffer = await crypto.subtle.importKey(
-                "raw",
-                base64ToArrayBuffer(generatedKey || AES_KEY),
-                { name: "AES-CBC" },
-                false,
-                ["decrypt"]
-            );
-
-            const decryptedBuffer = await crypto.subtle.decrypt(
-                {
-                    name: "AES-CBC",
-                    iv: base64ToArrayBuffer(AES_IV),
-                },
-                keyBuffer,
-                base64ToArrayBuffer(encryptedText)
-            );
-
-            const decryptedText = new TextDecoder().decode(decryptedBuffer);
-            resolve(decryptedText);
-
-        } catch (error) {
-            console.error("❌ AES decrypt failed:", error);
-            // Fail-safe: return original text (never block signature flow)
-            resolve(encryptedText);
-        }
-    });
 }
 
-async function encryptEmail(email) {
-    const key = await crypto.subtle.importKey(
-        "raw",
-        base64ToArrayBuffer(AES_KEY),
-        { name: "AES-CBC" },
-        false,
-        ["encrypt"]
-    );
+/* --------------------------------------------------
+   AES Decrypt (FAIL SAFE)
+-------------------------------------------------- */
+async function handleAesDecrypt(encryptedText, generatedKey) {
+    try {
+        if (!encryptedText) return "";
 
-    const encrypted = await crypto.subtle.encrypt(
-        { name: "AES-CBC", iv: base64ToArrayBuffer(AES_IV) },
-        key,
-        new TextEncoder().encode(email)
-    );
+        const keyBuffer = await crypto.subtle.importKey(
+            "raw",
+            base64ToArrayBuffer(generatedKey || AES_KEY),
+            { name: "AES-CBC" },
+            false,
+            ["decrypt"]
+        );
 
-    return btoa(String.fromCharCode(...new Uint8Array(encrypted)));
+        const decryptedBuffer = await crypto.subtle.decrypt(
+            {
+                name: "AES-CBC",
+                iv: base64ToArrayBuffer(AES_IV),
+            },
+            keyBuffer,
+            base64ToArrayBuffer(encryptedText)
+        );
+
+        return new TextDecoder().decode(decryptedBuffer);
+    } catch (err) {
+        console.error("❌ AES decrypt failed:", err);
+        return encryptedText; // NEVER throw
+    }
 }
 
+async function encryptEmail(email = "") {
+    try {
+        const key = await crypto.subtle.importKey(
+            "raw",
+            base64ToArrayBuffer(AES_KEY),
+            { name: "AES-CBC" },
+            false,
+            ["encrypt"]
+        );
+
+        const encrypted = await crypto.subtle.encrypt(
+            { name: "AES-CBC", iv: base64ToArrayBuffer(AES_IV) },
+            key,
+            new TextEncoder().encode(email)
+        );
+
+        return Buffer.from(encrypted).toString("base64");
+    } catch (err) {
+        console.error("❌ Email encryption failed:", err);
+        return "";
+    }
+}
+
+/* --------------------------------------------------
+   Fetch Signature (TIMEOUT SAFE)
+-------------------------------------------------- */
 async function fetchActiveSignature(encryptedEmail) {
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 8000);
+
     const res = await fetch(`${API_URL}/email-signature/outlook/get-active`, {
         method: "GET",
         headers: {
@@ -120,93 +118,104 @@ async function fetchActiveSignature(encryptedEmail) {
             "Content-Type": "application/json",
             username: encryptedEmail,
         },
+        signal: controller.signal,
     });
 
     if (!res.ok) {
-        throw new Error("Signature API failed: " + res.status);
+        throw new Error(`Signature API failed: ${res.status}`);
     }
 
-    // ✅ ALWAYS read as text first
     const rawText = await res.text();
 
     let encryptedPayload;
-
-    // ✅ If backend returned JSON string
     if (rawText.trim().startsWith("{")) {
-        const parsed = JSON.parse(rawText);
-        encryptedPayload = parsed?.data;
-    }
-    // ✅ If backend returned plain encrypted string
-    else {
+        encryptedPayload = JSON.parse(rawText)?.data;
+    } else {
         encryptedPayload = rawText;
     }
 
     if (!encryptedPayload) {
-        throw new Error("No encrypted payload received");
+        throw new Error("Empty encrypted payload");
     }
 
-    // ✅ Decrypt
     const decryptedText = await handleAesDecrypt(encryptedPayload);
-
-    // ✅ Parse decrypted JSON
-    const parsedData = JSON.parse(decryptedText);
-
-    return parsedData;
+    return JSON.parse(decryptedText);
 }
 
-
-app.post("/render-signature", async (req, res) => {
+/* --------------------------------------------------
+   Render Endpoint
+-------------------------------------------------- */
+app.post("/render-signature", async (req, res, next) => {
     try {
-
         const encryptedEmail = await encryptEmail(req?.body?.email);
-        const apiResponse = await fetchActiveSignature(encryptedEmail)
-        console.log(
-            apiResponse?.card, process?.env?.CORS_ORIGIN, process?.env?.API_URL, apiResponse?.elements,
-            `${API_URL}/v1/save/email-signature`
-        )
-        const elements = updateFieldsFromCard(apiResponse?.card, API_URL)([...apiResponse?.elements])
-        const png = await renderSignature({ elements }); // ✅ Buffer
-        const banner = apiResponse?.elements?.find(i => i?.key === "banner")?.link
+        const apiResponse = await fetchActiveSignature(encryptedEmail);
+
+        const elements = updateFieldsFromCard(
+            apiResponse?.card,
+            API_URL
+        )([...apiResponse?.elements]);
+
+        const png = await renderSignature({ elements });
+
+        const banner =
+            apiResponse?.elements?.find(i => i?.key === "banner")?.link || null;
+
         const formData = new FormData();
-        const pngBlob = new Blob([png], { type: "image/png" });
         formData.append(
             "emailSignatureFile",
-            pngBlob,
-            "email-signature.png" // filename
+            new Blob([png], { type: "image/png" }),
+            "email-signature.png"
         );
-        formData.append("cardId", apiResponse?.card?.cardUUID,);
-        const response = await fetch(
-            `${API_URL}/v1/save/email-signature`,
-            {
-                method: "POST",
-                headers: {
-                    accept: "*/*",
-                    adminusername: process.env?.ADMIN,
-                    authorization:
-                        // "Bearer YOUR_TOKEN"
-                        `Bearer ${process?.env?.AUTH_TOKEN}`
-                    ,
-                    organizationid: process?.env?.ORGID,
-                    username: process.env?.CB_USERNAME,
+        formData.append("cardId", apiResponse?.card?.cardUUID);
 
-                    // 🔴 IMPORTANT
-                    // ...formData.getHeaders(),
-                },
-                body: formData,
-            }
-        );
+        const saveRes = await fetch(`${API_URL}/v1/save/email-signature`, {
+            method: "POST",
+            headers: {
+                accept: "*/*",
+                adminusername: process.env.ADMIN,
+                authorization: `Bearer ${process.env.AUTH_TOKEN}`,
+                organizationid: process.env.ORGID,
+                username: process.env.CB_USERNAME,
+            },
+            body: formData,
+        });
 
-        const data = await response.json();
+        let data = {};
+        try {
+            data = await saveRes.json();
+        } catch { }
+
         res.setHeader("Cache-Control", "no-store");
         res.json({
             ...data,
-            bannerFileUrl: !!banner ? banner : null,
-            elements
+            bannerFileUrl: banner,
+            elements,
         });
-    } catch (e) {
-        console.error("❌ Render failed", e);
-        res.status(500).send(e);
+    } catch (err) {
+        console.error("❌ Render failed:", err);
+        next(err);
     }
+});
+
+/* --------------------------------------------------
+   Express Error Handler (MUST BE LAST)
+-------------------------------------------------- */
+app.use((err, req, res, next) => {
+    res.status(500).json({
+        success: false,
+        message: err?.message || "Internal Server Error",
+    });
+});
+
+/* --------------------------------------------------
+   Node Crash Guards (K8s SAFE)
+-------------------------------------------------- */
+process.on("unhandledRejection", err => {
+    console.error("🔥 Unhandled Rejection:", err);
+});
+
+process.on("uncaughtException", err => {
+    console.error("💥 Uncaught Exception:", err);
 });
 
 /* --------------------------------------------------
