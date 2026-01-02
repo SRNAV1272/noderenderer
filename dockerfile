@@ -9,7 +9,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 # -------------------------------------------------
-# Native build deps + font system
+# Native build deps + fonts (Alpine 3.21 compatible)
 # -------------------------------------------------
 RUN apk add --no-cache \
     python3 \
@@ -29,19 +29,20 @@ RUN apk add --no-cache \
     ttf-dejavu \
     ttf-liberation \
     ttf-freefont \
-    noto-fonts \
-    noto-fonts-cjk \
-    noto-fonts-emoji
+    font-noto \
+    font-noto-cjk \
+    font-noto-emoji
 
 # Build font cache (CRITICAL)
 RUN fc-cache -f -v
 
 # -------------------------------------------------
-# App deps
+# Install node deps
 # -------------------------------------------------
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
+# Copy source
 COPY . .
 
 # =================================================
@@ -92,15 +93,15 @@ RUN apk add --no-cache \
     ttf-dejavu \
     ttf-liberation \
     ttf-freefont \
-    noto-fonts \
-    noto-fonts-cjk \
-    noto-fonts-emoji
+    font-noto \
+    font-noto-cjk \
+    font-noto-emoji
 
-# Rebuild font cache again (CRITICAL)
+# Rebuild font cache
 RUN fc-cache -f -v
 
 # -------------------------------------------------
-# Security user
+# Create non-root user
 # -------------------------------------------------
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
@@ -113,7 +114,7 @@ COPY --from=build /app/index.js ./index.js
 COPY --from=build /app/konva ./konva
 COPY --from=build /app/utils ./utils
 
-# If you have fonts folder, uncomment:
+# If you have custom fonts, uncomment:
 # COPY --from=build /app/fonts /usr/share/fonts/custom
 # RUN fc-cache -f -v
 
