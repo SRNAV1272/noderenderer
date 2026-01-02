@@ -1,33 +1,3 @@
-# syntax=docker/dockerfile:1.7
-
-# -------------------------------------------------
-# BUILD STAGE
-# -------------------------------------------------
-FROM node:18-alpine AS build
-
-WORKDIR /app
-ENV NODE_ENV=production
-
-# Native build deps for canvas + sharp
-RUN apk add --no-cache \
-    python3 \
-    make \
-    g++ \
-    cairo-dev \
-    pango-dev \
-    pixman-dev \
-    freetype-dev \
-    harfbuzz-dev \
-    fribidi-dev \
-    libpng-dev \
-    jpeg-dev \
-    vips-dev \
-    glib-dev
-
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
-COPY . .
-
 # -------------------------------------------------
 # RUNTIME STAGE
 # -------------------------------------------------
@@ -56,7 +26,7 @@ ENV username=${username}
 ENV orgid=${orgid}
 # --------------------------
 
-# Runtime libs only
+# Runtime deps + fonts (RUNTIME MUST ALSO HAVE THEM)
 RUN apk add --no-cache \
     cairo \
     pango \
@@ -68,7 +38,17 @@ RUN apk add --no-cache \
     jpeg \
     vips \
     glib \
-    libc6-compat
+    libc6-compat \
+    fontconfig \
+    ttf-dejavu \
+    ttf-liberation \
+    ttf-freefont \
+    noto-fonts \
+    noto-fonts-cjk \
+    noto-fonts-emoji
+
+# Rebuild font cache again
+RUN fc-cache -f -v
 
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
