@@ -1,0 +1,88 @@
+apiVersion: "v1"
+kind: "ServiceAccount"
+metadata:
+  name: "node-renderer"
+  namespace: "cardbyte-frontend"
+  labels:
+    app: "node-renderer"
+
+---
+
+apiVersion: "v1"
+kind: "Service"
+metadata:
+  name: "node-renderer"
+  namespace: "cardbyte-frontend"
+  labels:
+    app: "node-renderer"
+spec:
+  type: "ClusterIP"
+  ports:
+    - targetPort: 4000
+      port: 4000
+      protocol: "TCP"
+      name: "http-port"
+  selector:
+    app: "node-renderer"
+
+---
+
+apiVersion: "apps/v1"
+kind: "Deployment"
+metadata:
+  name: "node-renderer"
+  namespace: "cardbyte-frontend"
+  labels:
+    app: "node-renderer"
+  annotations:
+    timestamp: "20251230T162532"
+spec:
+  replicas: 1
+  strategy:
+    rollingUpdate:
+      maxSurge: "100%"
+      maxUnavailable: "5%"
+    type: "RollingUpdate"
+  minReadySeconds: 0
+  revisionHistoryLimit: 10
+  progressDeadlineSeconds: 600
+  selector:
+    matchLabels:
+      app: "node-renderer"
+  template:
+    metadata:
+      labels:
+        app: "node-renderer"
+      annotations:
+        timestamp: "20251230T162532"
+    spec:
+      serviceAccountName: "node-renderer"
+      terminationGracePeriodSeconds: 30
+      imagePullSecrets:
+        - name: "lower-regcred"
+      containers:
+        - name: "node-renderer"
+          image: "lower.azurecr.io/new-qa/node-renderer:1.2"
+          imagePullPolicy: "Always"
+          command: null
+          args: null
+          ports:
+            - containerPort: 4000
+              protocol: "TCP"
+              name: "http-port"
+          envFrom: null
+          resources:
+            limits:
+              cpu: "50m"
+              memory: "100Mi"
+            requests:
+              cpu: "50m"
+              memory: "100Mi"
+          livenessProbe: null
+          readinessProbe: null
+          volumeMounts: null
+      nodeSelector: {}
+      affinity: {}
+      tolerations: []
+      volumes: null
+
