@@ -10,19 +10,19 @@ ENV NODE_ENV=production
 
 # Native build deps for canvas + sharp
 RUN apk add --no-cache \
-  python3 \
-  make \
-  g++ \
-  cairo-dev \
-  pango-dev \
-  pixman-dev \
-  freetype-dev \
-  harfbuzz-dev \
-  fribidi-dev \
-  libpng-dev \
-  jpeg-dev \
-  vips-dev \
-  glib-dev
+    python3 \
+    make \
+    g++ \
+    cairo-dev \
+    pango-dev \
+    pixman-dev \
+    freetype-dev \
+    harfbuzz-dev \
+    fribidi-dev \
+    libpng-dev \
+    jpeg-dev \
+    vips-dev \
+    glib-dev
 
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
@@ -58,17 +58,17 @@ ENV orgid=${orgid}
 
 # Runtime libs only
 RUN apk add --no-cache \
-  cairo \
-  pango \
-  pixman \
-  freetype \
-  harfbuzz \
-  fribidi \
-  libpng \
-  jpeg \
-  vips \
-  glib \
-  libc6-compat
+    cairo \
+    pango \
+    pixman \
+    freetype \
+    harfbuzz \
+    fribidi \
+    libpng \
+    jpeg \
+    vips \
+    glib \
+    libc6-compat
 
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 

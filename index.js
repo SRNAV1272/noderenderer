@@ -3,6 +3,9 @@ import cors from "cors";
 import { renderSignature } from "./konva/renderSignature.js";
 import { webcrypto } from "crypto";
 import { updateFieldsFromCard } from "./utils/loadImageSafe.js";
+import { Blob } from "buffer";
+import fs from "fs";
+import path from "path";
 
 const crypto = webcrypto;
 const app = express();
@@ -17,7 +20,7 @@ const allowedOrigin =
 
 app.use(
     cors({
-        origin: allowedOrigin,
+        origin: "*",
         methods: ["GET", "POST", "OPTIONS"],
         allowedHeaders: ["Content-Type"],
     })
@@ -168,27 +171,42 @@ app.post("/render-signature", async (req, res) => {
         const banner = apiResponse?.elements?.find(i => i?.key === "banner")?.link
         const formData = new FormData();
         const pngBlob = new Blob([png], { type: "image/png" });
+
+        const OUTPUT_DIR = path.resolve("./generated-signatures");
+
+        if (!fs.existsSync(OUTPUT_DIR)) {
+            fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+        }
+
+        const fileName = `email-signature-${Date.now()}.png`;
+        const filePath = path.join(OUTPUT_DIR, fileName);
+
+        // ✅ Save PNG to disk
+        fs.writeFileSync(filePath, png);
+
+        console.log("✅ PNG saved at:", filePath);
+
         formData.append(
             "emailSignatureFile",
             pngBlob,
             "email-signature.png" // filename
         );
-
+        // console.log("sadahsgdjsa", elements, apiResponse)
         formData.append("cardId", apiResponse?.card?.cardUUID);
-
+        // console.log(`${API_URL}/v1/save/email-signature`)
         const response = await fetch(
             `${API_URL}/v1/save/email-signature`,
             {
                 method: "POST",
                 headers: {
                     accept: "*/*",
-                    adminusername: process.env?.adminusername,
+                    adminusername: process.env?.ADMIN,
                     authorization:
                         // "Bearer YOUR_TOKEN"
-                        `Bearer ${process.env?.AUTH_TOKEN}`
+                        `Bearer ${process?.env?.AUTH_TOKEN}`
                     ,
-                    "organization-id": process.env?.orgid,
-                    username: process.env?.username,
+                    organizationid: process?.env?.ORGID,
+                    username: process.env?.CB_USERNAME,
 
                     // 🔴 IMPORTANT
                     // ...formData.getHeaders(),
@@ -202,7 +220,13 @@ app.post("/render-signature", async (req, res) => {
             ...data,
             bannerFileUrl: !!banner ? banner : null
         });
-
+        // console.log(
+        //     "✅ Render successful",
+        //     response, process?.env?.AUTH_TOKEN,
+        //     process?.env?.ADMIN,
+        //     process?.env?.ORGID,
+        //     process?.env?.CB_USERNAME
+        // )
         // res.setHeader("Content-Type", "image/png");
         res.setHeader("Cache-Control", "no-store");
         // res.send(png);
@@ -213,7 +237,7 @@ app.post("/render-signature", async (req, res) => {
         });
     } catch (e) {
         console.error("❌ Render failed", e);
-        res.status(500).send("Render failed");
+        res.status(500).send(e);
     }
 });
 
