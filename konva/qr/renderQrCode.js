@@ -12,7 +12,6 @@ export async function renderQRCode({
     const qr = QRCode.create(value, {
         errorCorrectionLevel: "H"
     });
-
     const count = qr.modules.size;
     const data = qr.modules.data;
 

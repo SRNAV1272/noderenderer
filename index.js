@@ -4,8 +4,6 @@ import { renderSignature } from "./konva/renderSignature.js";
 import { webcrypto } from "crypto";
 import { updateFieldsFromCard } from "./utils/loadImageSafe.js";
 import { Blob } from "buffer";
-import fs from "fs";
-import path from "path";
 
 const crypto = webcrypto;
 const app = express();
@@ -13,10 +11,6 @@ const app = express();
 /* --------------------------------------------------
    ✅ CORS (Express 5 compatible)
 -------------------------------------------------- */
-const allowedOrigin =
-    process.env.NODE_ENV === "production"
-        ? process.env?.CORS_ORIGIN
-        : "http://localhost:3001";
 
 app.use(
     cors({
@@ -171,29 +165,13 @@ app.post("/render-signature", async (req, res) => {
         const banner = apiResponse?.elements?.find(i => i?.key === "banner")?.link
         const formData = new FormData();
         const pngBlob = new Blob([png], { type: "image/png" });
-
-        const OUTPUT_DIR = path.resolve("./generated-signatures");
-
-        if (!fs.existsSync(OUTPUT_DIR)) {
-            fs.mkdirSync(OUTPUT_DIR, { recursive: true });
-        }
-
-        const fileName = `email-signature-${Date.now()}.png`;
-        const filePath = path.join(OUTPUT_DIR, fileName);
-
-        // ✅ Save PNG to disk
-        fs.writeFileSync(filePath, png);
-
-        console.log("✅ PNG saved at:", filePath);
-
+        console.log(apiResponse?.card, process?.env?.CORS_ORIGIN, process?.env?.API_URL)
         formData.append(
             "emailSignatureFile",
             pngBlob,
             "email-signature.png" // filename
         );
-        // console.log("sadahsgdjsa", elements, apiResponse)
         formData.append("cardId", apiResponse?.card?.cardUUID);
-        // console.log(`${API_URL}/v1/save/email-signature`)
         const response = await fetch(
             `${API_URL}/v1/save/email-signature`,
             {
@@ -216,25 +194,12 @@ app.post("/render-signature", async (req, res) => {
         );
 
         const data = await response.json();
-        console.log({
-            ...data,
-            bannerFileUrl: !!banner ? banner : null
-        });
-        // console.log(
-        //     "✅ Render successful",
-        //     response, process?.env?.AUTH_TOKEN,
-        //     process?.env?.ADMIN,
-        //     process?.env?.ORGID,
-        //     process?.env?.CB_USERNAME
-        // )
-        res.setHeader("Content-Type", "image/png");
         res.setHeader("Cache-Control", "no-store");
-        res.send(png);
-        // res.json({
-        //     ...data,
-        //     bannerFileUrl: !!banner ? banner : null,
-        //     elements
-        // });
+        res.json({
+            ...data,
+            bannerFileUrl: !!banner ? banner : null,
+            elements
+        });
     } catch (e) {
         console.error("❌ Render failed", e);
         res.status(500).send(e);

@@ -11,7 +11,6 @@ export async function loadImageSafe(src) {
 }
 
 export const updateFieldsFromCard = (card, BASE_URL) => (prevFields) => {
-    // console.log("sadlkaskdahd", card, prevFields)
     if (!card) return prevFields;
     let youtubeIndex = 0; // for duplicate socials
 

@@ -22,10 +22,10 @@ export async function loadImage(url) {
 
     if (url.includes("localhost")) {
         fetchUrl = url
-            .replace("http://localhost:3000", "https://newqa-enterprise.cardbyte.ai")
-            .replace("https://localhost:3000", "https://newqa-enterprise.cardbyte.ai")
-            .replace("http://localhost", "https://newqa-enterprise.cardbyte.ai")
-            .replace("https://localhost", "https://newqa-enterprise.cardbyte.ai");
+            .replace("http://localhost:3000", process?.env?.API_URL)
+            .replace("https://localhost:3000", process?.env?.API_URL)
+            .replace("http://localhost", process?.env?.API_URL)
+            .replace("https://localhost", process?.env?.API_URL);
 
         console.warn("🔁 URL rewritten:", fetchUrl);
     }
