@@ -1,12 +1,60 @@
+# syntax=docker/dockerfile:1.7
+
+# =================================================
+# BUILD STAGE
+# =================================================
+FROM node:18-alpine AS build
+
+WORKDIR /app
+ENV NODE_ENV=production
+
 # -------------------------------------------------
+# Native build deps + font system
+# -------------------------------------------------
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    cairo-dev \
+    pango-dev \
+    pixman-dev \
+    freetype-dev \
+    harfbuzz-dev \
+    fribidi-dev \
+    libpng-dev \
+    jpeg-dev \
+    vips-dev \
+    glib-dev \
+    fontconfig \
+    ttf-dejavu \
+    ttf-liberation \
+    ttf-freefont \
+    noto-fonts \
+    noto-fonts-cjk \
+    noto-fonts-emoji
+
+# Build font cache (CRITICAL)
+RUN fc-cache -f -v
+
+# -------------------------------------------------
+# App deps
+# -------------------------------------------------
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
+
+COPY . .
+
+# =================================================
 # RUNTIME STAGE
-# -------------------------------------------------
+# =================================================
 FROM node:18-alpine AS runtime
 
 WORKDIR /app
 ENV NODE_ENV=production
 
-# -------- ENV PATCH --------
+# -------------------------------------------------
+# Runtime env variables
+# -------------------------------------------------
 ARG CORS_ORIGIN
 ARG API_URL
 ARG AUTH_TOKEN
@@ -24,9 +72,10 @@ ENV AES_IV=${AES_IV}
 ENV adminusername=${adminusername}
 ENV username=${username}
 ENV orgid=${orgid}
-# --------------------------
 
-# Runtime deps + fonts (RUNTIME MUST ALSO HAVE THEM)
+# -------------------------------------------------
+# Runtime native deps + fonts
+# -------------------------------------------------
 RUN apk add --no-cache \
     cairo \
     pango \
@@ -47,16 +96,26 @@ RUN apk add --no-cache \
     noto-fonts-cjk \
     noto-fonts-emoji
 
-# Rebuild font cache again
+# Rebuild font cache again (CRITICAL)
 RUN fc-cache -f -v
 
+# -------------------------------------------------
+# Security user
+# -------------------------------------------------
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
+# -------------------------------------------------
+# Copy app from build stage
+# -------------------------------------------------
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/index.js ./index.js
 COPY --from=build /app/konva ./konva
 COPY --from=build /app/utils ./utils
+
+# If you have fonts folder, uncomment:
+# COPY --from=build /app/fonts /usr/share/fonts/custom
+# RUN fc-cache -f -v
 
 RUN chown -R appuser:appgroup /app
 USER appuser
