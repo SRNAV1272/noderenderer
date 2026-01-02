@@ -287,7 +287,7 @@ export async function renderSignature({ elements }) {
             x: iconNode ? iconSize + 1 : 0,
             y: 0,
             text: `${!!field.label && field.label !== "ICON" && !field?.key?.startsWith("customText-") ? field.label + " : " : ""} ${displayText}`,
-            width: field.width * 1.08,
+            width: field.width * 1.1,
             fontSize: field.fontSize * 0.82,
             fontFamily: field.fontFamily || "Arial",
             fontStyle: resolveFontStyle(field),

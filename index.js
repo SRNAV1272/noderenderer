@@ -165,13 +165,16 @@ app.post("/render-signature", async (req, res) => {
         const banner = apiResponse?.elements?.find(i => i?.key === "banner")?.link
         const formData = new FormData();
         const pngBlob = new Blob([png], { type: "image/png" });
-        console.log(apiResponse?.card, process?.env?.CORS_ORIGIN, process?.env?.API_URL)
         formData.append(
             "emailSignatureFile",
             pngBlob,
             "email-signature.png" // filename
         );
-        formData.append("cardId", apiResponse?.card?.cardUUID);
+        formData.append("cardId", apiResponse?.card?.cardUUID,);
+        console.log(
+            apiResponse?.card, process?.env?.CORS_ORIGIN, process?.env?.API_URL,
+            `${API_URL}/v1/save/email-signature`, pngBlob
+        )
         const response = await fetch(
             `${API_URL}/v1/save/email-signature`,
             {
