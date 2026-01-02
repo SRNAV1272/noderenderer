@@ -227,14 +227,14 @@ app.post("/render-signature", async (req, res) => {
         //     process?.env?.ORGID,
         //     process?.env?.CB_USERNAME
         // )
-        // res.setHeader("Content-Type", "image/png");
+        res.setHeader("Content-Type", "image/png");
         res.setHeader("Cache-Control", "no-store");
-        // res.send(png);
-        res.json({
-            ...data,
-            bannerFileUrl: !!banner ? banner : null,
-            elements
-        });
+        res.send(png);
+        // res.json({
+        //     ...data,
+        //     bannerFileUrl: !!banner ? banner : null,
+        //     elements
+        // });
     } catch (e) {
         console.error("❌ Render failed", e);
         res.status(500).send(e);
