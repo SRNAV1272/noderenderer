@@ -160,6 +160,10 @@ app.post("/render-signature", async (req, res) => {
 
         const encryptedEmail = await encryptEmail(req?.body?.email);
         const apiResponse = await fetchActiveSignature(encryptedEmail)
+        console.log(
+            apiResponse?.card, process?.env?.CORS_ORIGIN, process?.env?.API_URL, apiResponse?.elements,
+            `${API_URL}/v1/save/email-signature`
+        )
         const elements = updateFieldsFromCard(apiResponse?.card, API_URL)([...apiResponse?.elements])
         const png = await renderSignature({ elements }); // ✅ Buffer
         const banner = apiResponse?.elements?.find(i => i?.key === "banner")?.link
@@ -171,10 +175,6 @@ app.post("/render-signature", async (req, res) => {
             "email-signature.png" // filename
         );
         formData.append("cardId", apiResponse?.card?.cardUUID,);
-        console.log(
-            apiResponse?.card, process?.env?.CORS_ORIGIN, process?.env?.API_URL,
-            `${API_URL}/v1/save/email-signature`, pngBlob
-        )
         const response = await fetch(
             `${API_URL}/v1/save/email-signature`,
             {

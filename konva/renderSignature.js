@@ -38,6 +38,27 @@ function getGroupedText(allFields, options, key) {
 }
 
 /* --------------------------------
+   Fault-tolerant helpers
+-------------------------------- */
+
+function safeAddImage(layer, config, label = "image") {
+    try {
+        if (!config?.image || !config.image.width || !config.image.height) return;
+        layer.add(new Konva.Image(config));
+    } catch (err) {
+        console.warn(`⚠️ Skipped ${label}:`, err.message);
+    }
+}
+
+function safe(fn, label = "operation") {
+    try {
+        fn();
+    } catch (err) {
+        console.warn(`⚠️ Skipped ${label}:`, err.message);
+    }
+}
+
+/* --------------------------------
    MAIN RENDERER
 -------------------------------- */
 
@@ -101,23 +122,63 @@ export async function renderSignature({ elements }) {
        BACKGROUND (ONLY HERE)
     -------------------------------- */
 
+    // const bgColor = elements.find(e => e.key === "backgroundColor");
+    // const bgImage = elements.find(e => e.key === "backgroundImage" && e.show);
+    // console.log("BACKGROUND IMAGE", bgImage);
+    // if (bgImage?.link || bgImage?.value) {
+    //     console.log("BACKGROUND IMAGE", bgImage);
+
+    //     const img = await loadImage(bgImage.link || bgImage.value);
+    //     if (img) {
+    //         backgroundLayer.add(
+    //             new Konva.Image({
+    //                 image: img,
+    //                 x: 0,
+    //                 y: 0,
+    //                 width: stageWidth,
+    //                 height: stageHeight,
+    //                 cornerRadius: 8,
+    //                 listening: false
+    //             })
+    //         );
+    //     }
+    // } else {
+    //     backgroundLayer.add(
+    //         new Konva.Rect({
+    //             x: 0,
+    //             y: 0,
+    //             width: stageWidth,
+    //             height: stageHeight,
+    //             fill: bgColor?.value || "#ffffff",
+    //             cornerRadius: 8,
+    //             listening: false
+    //         })
+    //     );
+    // }
     const bgColor = elements.find(e => e.key === "backgroundColor");
     const bgImage = elements.find(e => e.key === "backgroundImage" && e.show);
-    if (bgImage?.link || bgImage?.value) {
-        const img = await loadImage(bgImage.link || bgImage.value);
-        if (img) {
-            backgroundLayer.add(
-                new Konva.Image({
-                    image: img,
-                    x: 0,
-                    y: 0,
-                    width: stageWidth,
-                    height: stageHeight,
-                    cornerRadius: 8,
-                    listening: false
-                })
-            );
-        }
+
+    const bgSrc =
+        bgImage?.link?.trim() ||
+        bgImage?.value?.trim() ||
+        null;
+
+    if (bgSrc) {
+        const img = await loadImage(bgSrc);
+
+        safeAddImage(
+            backgroundLayer,
+            {
+                image: img,
+                x: 0,
+                y: 0,
+                width: stageWidth,
+                height: stageHeight,
+                cornerRadius: 8,
+                listening: false
+            },
+            "background"
+        );
     } else {
         backgroundLayer.add(
             new Konva.Rect({
@@ -189,8 +250,21 @@ export async function renderSignature({ elements }) {
         const img = await loadImage(field.link || field.value);
         if (!img) continue;
 
-        imageLayer.add(
-            new Konva.Image({
+        // imageLayer.add(
+        //     new Konva.Image({
+        //         image: img,
+        //         x: field.position.x,
+        //         y: field.position.y,
+        //         width: field.width,
+        //         height: field.height,
+        //         cornerRadius:
+        //             field.key === "profilePhoto" ? field.width / 2 : 0,
+        //         listening: false
+        //     })
+        // );
+        safeAddImage(
+            imageLayer,
+            {
                 image: img,
                 x: field.position.x,
                 y: field.position.y,
@@ -199,8 +273,10 @@ export async function renderSignature({ elements }) {
                 cornerRadius:
                     field.key === "profilePhoto" ? field.width / 2 : 0,
                 listening: false
-            })
+            },
+            field.key
         );
+
     }
 
     /* --------------------------------
