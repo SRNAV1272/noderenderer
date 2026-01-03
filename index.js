@@ -4,6 +4,7 @@ import { renderSignature } from "./konva/renderSignature.js";
 import { webcrypto } from "crypto";
 import { updateFieldsFromCard } from "./utils/loadImageSafe.js";
 import { Blob } from "buffer";
+import { performance } from "perf_hooks";
 
 const crypto = webcrypto;
 const app = express();
@@ -158,18 +159,104 @@ async function fetchActiveSignature(encryptedEmail) {
 /* --------------------------------------------------
    Render Endpoint
 -------------------------------------------------- */
+// app.post("/render-signature", async (req, res, next) => {
+//     try {
+//         const t0 = performance.now(); // total start
+//         const tEncryptStart = performance.now();
+//         const encryptedEmail = await encryptEmail(req?.body?.email);
+//         const tEncryptEnd = performance.now();
+//         // const apiResponse = await fetchActiveSignature(encryptedEmail);
+//         const apiResponse = await fetchWithRetry(encryptedEmail, 2);
+//         console.log("✅ Fetched signature data for:", apiResponse)
+//         const elements = updateFieldsFromCard(
+//             apiResponse?.card,
+//             API_URL
+//         )([...apiResponse?.elements]);
+
+//         const png = await renderSignature({ elements });
+
+//         const banner =
+//             apiResponse?.elements?.find(i => i?.key === "banner")?.link || null;
+
+//         const formData = new FormData();
+//         formData.append(
+//             "emailSignatureFile",
+//             new Blob([png], { type: "image/png" }),
+//             "email-signature.png"
+//         );
+//         formData.append("cardId", apiResponse?.card?.cardUUID);
+
+//         const saveRes = await fetch(`${API_URL}/v1/save/email-signature`, {
+//             method: "POST",
+//             headers: {
+//                 accept: "*/*",
+//                 adminusername: process.env.ADMIN,
+//                 authorization: `Bearer ${process.env.AUTH_TOKEN}`,
+//                 organizationid: process.env.ORGID,
+//                 username: process.env.CB_USERNAME,
+//             },
+//             body: formData,
+//         });
+
+//         let data = {};
+//         try {
+//             data = await saveRes.json();
+//         } catch (err) {
+//             next(new Error("Failed to parse save response JSON"));
+//         }
+
+//         res.setHeader("Cache-Control", "no-store");
+//         res.json({
+//             ...data,
+//             bannerFileUrl: banner,
+//             elements,
+//         });
+//     } catch (err) {
+//         console.error("❌ Render failed:", err);
+//         next(new Error("Failed to render signature"));
+//     }
+// });
+
+
 app.post("/render-signature", async (req, res, next) => {
+    const t0 = performance.now(); // total start
+
     try {
+        // ----------------------------
+        // Encrypt email
+        // ----------------------------
+        const tEncryptStart = performance.now();
         const encryptedEmail = await encryptEmail(req?.body?.email);
-        // const apiResponse = await fetchActiveSignature(encryptedEmail);
+        const tEncryptEnd = performance.now();
+
+        // ----------------------------
+        // Fetch signature
+        // ----------------------------
+        const tFetchStart = performance.now();
         const apiResponse = await fetchWithRetry(encryptedEmail, 2);
-        console.log("✅ Fetched signature data for:", apiResponse)
+        const tFetchEnd = performance.now();
+
+        // ----------------------------
+        // Prepare elements
+        // ----------------------------
+        const tElementsStart = performance.now();
         const elements = updateFieldsFromCard(
             apiResponse?.card,
             API_URL
         )([...apiResponse?.elements]);
+        const tElementsEnd = performance.now();
 
+        // ----------------------------
+        // Render PNG (MOST IMPORTANT)
+        // ----------------------------
+        const tRenderStart = performance.now();
         const png = await renderSignature({ elements });
+        const tRenderEnd = performance.now();
+
+        // ----------------------------
+        // Upload PNG
+        // ----------------------------
+        const tUploadStart = performance.now();
 
         const banner =
             apiResponse?.elements?.find(i => i?.key === "banner")?.link || null;
@@ -197,9 +284,24 @@ app.post("/render-signature", async (req, res, next) => {
         let data = {};
         try {
             data = await saveRes.json();
-        } catch (err) {
-            next(new Error("Failed to parse save response JSON"));
+        } catch {
+            throw new Error("Failed to parse save response JSON");
         }
+
+        const tUploadEnd = performance.now();
+        const t1 = performance.now(); // total end
+
+        // ----------------------------
+        // ⏱️ LOG TIMINGS
+        // ----------------------------
+        console.table({
+            "Encrypt email (ms)": (tEncryptEnd - tEncryptStart).toFixed(2),
+            "Fetch signature (ms)": (tFetchEnd - tFetchStart).toFixed(2),
+            "Prepare elements (ms)": (tElementsEnd - tElementsStart).toFixed(2),
+            "Render PNG (ms)": (tRenderEnd - tRenderStart).toFixed(2),
+            "Upload PNG (ms)": (tUploadEnd - tUploadStart).toFixed(2),
+            "TOTAL API time (ms)": (t1 - t0).toFixed(2)
+        });
 
         res.setHeader("Cache-Control", "no-store");
         res.json({

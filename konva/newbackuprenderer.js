@@ -2,13 +2,6 @@ import Konva from "./setup.js";
 import { renderIcon } from "./icons/index.js";
 import { loadImage } from "./loadImage.js";
 import { renderQRCode } from "./qr/renderQrCode.js";
-import { createCanvas, Image } from "canvas";
-
-/* --------------------------------
-   GLOBAL BACKGROUND RESIZE CACHE
--------------------------------- */
-
-const resizedBgCache = new Map();
 
 /* --------------------------------
    Helpers
@@ -51,53 +44,7 @@ function safeAddImage(layer, config) {
 }
 
 /* --------------------------------
-   Resize + Cache Background (OPTIMIZED)
--------------------------------- */
-
-async function getResizedBackgroundFromImage(img, width, height, radius = 12) {
-    const cacheKey = `${img.src || "mem"}_${width}_${height}_${radius}`;
-    if (resizedBgCache.has(cacheKey)) {
-        return resizedBgCache.get(cacheKey);
-    }
-
-    const canvas = createCanvas(width, height);
-    const ctx = canvas.getContext("2d");
-
-    // ✅ High quality scaling
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = "high";
-
-    // --------------------------------------------------
-    // 🔵 Rounded rectangle clip
-    // --------------------------------------------------
-    ctx.beginPath();
-    ctx.moveTo(radius, 0);
-    ctx.lineTo(width - radius, 0);
-    ctx.quadraticCurveTo(width, 0, width, radius);
-    ctx.lineTo(width, height - radius);
-    ctx.quadraticCurveTo(width, height, width - radius, height);
-    ctx.lineTo(radius, height);
-    ctx.quadraticCurveTo(0, height, 0, height - radius);
-    ctx.lineTo(0, radius);
-    ctx.quadraticCurveTo(0, 0, radius, 0);
-    ctx.closePath();
-
-    ctx.clip();
-
-    // --------------------------------------------------
-    // 🖼 Draw image inside clipped area
-    // --------------------------------------------------
-    ctx.drawImage(img, 0, 0, width, height);
-
-    const out = new Image();
-    out.src = canvas.toBuffer("image/png");
-
-    resizedBgCache.set(cacheKey, out);
-    return out;
-}
-
-/* --------------------------------
-   MAIN RENDERER
+   MAIN RENDERER (FAST)
 -------------------------------- */
 
 export async function renderSignature({ elements }) {
@@ -107,7 +54,7 @@ export async function renderSignature({ elements }) {
     -------------------------------- */
 
     const BASE_WIDTH = 336;
-    const EXPORT_SCALE = 1.5;
+    const EXPORT_SCALE = 1.5; // 🔥 controls output quality
 
     const signatureMeta = elements.find(el => el.key === "signatureName");
     const ratio =
@@ -117,9 +64,6 @@ export async function renderSignature({ elements }) {
 
     const stageWidth = BASE_WIDTH;
     const stageHeight = Math.round(BASE_WIDTH / ratio);
-
-    const OUTPUT_WIDTH = Math.round(stageWidth * EXPORT_SCALE);
-    const OUTPUT_HEIGHT = Math.round(stageHeight * EXPORT_SCALE);
 
     const options = {
         fullName: ["prefix", "firstName", "lastName"],
@@ -141,7 +85,7 @@ export async function renderSignature({ elements }) {
     };
 
     /* --------------------------------
-       PRELOAD ALL IMAGES (USING OPTIMIZED loadImage)
+       PARALLEL IMAGE LOADING (HUGE WIN)
     -------------------------------- */
 
     const imageCache = new Map();
@@ -150,80 +94,64 @@ export async function renderSignature({ elements }) {
         elements.map(async field => {
             if (!field.show) return;
 
-            if (
-                ["logo", "profilePhoto", "backgroundImage"].includes(field.key)
-            ) {
-                const src = field.link || field.value;
-                if (!src) return;
+            const src =
+                field.key === "backgroundImage"
+                    ? field.link || field.value
+                    : ["logo", "profilePhoto"].includes(field.key)
+                        ? field.link || field.value
+                        : null;
 
+            if (!src) return;
+
+            try {
                 const img = await loadImage(src);
                 if (img) imageCache.set(field.key, img);
-            }
+            } catch { }
         })
     );
 
     /* --------------------------------
-       STAGE (FINAL OUTPUT SIZE)
+       STAGE + LAYERS (NO SCALING)
     -------------------------------- */
 
     const stage = new Konva.Stage({
-        width: OUTPUT_WIDTH,
-        height: OUTPUT_HEIGHT,
+        width: stageWidth,
+        height: stageHeight,
         listening: false
     });
 
     const backgroundLayer = new Konva.Layer({ listening: false });
-    const shapeLayer = new Konva.Layer({
-        listening: false,
-        scaleX: EXPORT_SCALE,
-        scaleY: EXPORT_SCALE
-    });
-    const imageLayer = new Konva.Layer({
-        listening: false,
-        scaleX: EXPORT_SCALE,
-        scaleY: EXPORT_SCALE
-    });
-    const textLayer = new Konva.Layer({
-        listening: false,
-        scaleX: EXPORT_SCALE,
-        scaleY: EXPORT_SCALE
-    });
+    const shapeLayer = new Konva.Layer({ listening: false });
+    const imageLayer = new Konva.Layer({ listening: false });
+    const textLayer = new Konva.Layer({ listening: false });
 
     stage.add(backgroundLayer, shapeLayer, imageLayer, textLayer);
 
     /* --------------------------------
-       BACKGROUND (CRISP + FAST)
+       BACKGROUND
     -------------------------------- */
 
     const bgColor = elements.find(e => e.key === "backgroundColor");
     const bgImg = imageCache.get("backgroundImage");
 
     if (bgImg) {
-        const resizedBg = await getResizedBackgroundFromImage(
-            bgImg,
-            OUTPUT_WIDTH,
-            OUTPUT_HEIGHT
-        );
-
-        backgroundLayer.add(
-            new Konva.Image({
-                image: resizedBg,
-                x: 0,
-                y: 0,
-                width: OUTPUT_WIDTH,
-                height: OUTPUT_HEIGHT,
-                listening: false
-            })
-        );
+        safeAddImage(backgroundLayer, {
+            image: bgImg,
+            x: 0,
+            y: 0,
+            width: stageWidth,
+            height: stageHeight,
+            cornerRadius: 8
+        });
     } else {
         backgroundLayer.add(
             new Konva.Rect({
                 x: 0,
                 y: 0,
-                width: OUTPUT_WIDTH,
-                height: OUTPUT_HEIGHT,
+                width: stageWidth,
+                height: stageHeight,
                 fill: bgColor?.value || "#ffffff",
-                listening: false
+                cornerRadius: 8
             })
         );
     }
@@ -365,12 +293,12 @@ export async function renderSignature({ elements }) {
     }
 
     /* --------------------------------
-       EXPORT
+       EXPORT (FAST & STABLE)
     -------------------------------- */
 
     stage.draw();
 
     return stage
-        .toCanvas({ pixelRatio: 1 })
+        .toCanvas({ pixelRatio: EXPORT_SCALE })
         .toBuffer("image/png");
 }
