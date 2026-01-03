@@ -223,6 +223,7 @@ export async function renderSignature({ elements }) {
                 width: OUTPUT_WIDTH,
                 height: OUTPUT_HEIGHT,
                 fill: bgColor?.value || "#ffffff",
+                cornerRadius: 8,
                 listening: false
             })
         );
@@ -287,21 +288,28 @@ export async function renderSignature({ elements }) {
     }
 
     /* --------------------------------
-       QR CODE
+       QR CODE (PATCH)
     -------------------------------- */
 
     const qrField = elements.find(e => e.key === "qrCode" && e.show);
+
     if (qrField) {
+        console.log("Rendering QR Code...");
+
         const qrGroup = await renderQRCode({
-            x: qrField.position.x,
-            y: qrField.position.y,
-            size: 80,
-            value: qrField.link || "Link Missing!",
-            fgColor: "#000",
-            bgColor: "#fff"
+            x: qrField?.position?.x,
+            y: qrField?.position?.y,
+            size: 80 * EXPORT_SCALE,
+            value: qrField.link || "Link Missing!"
         });
+
+        qrGroup.listening(false);
+
         imageLayer.add(qrGroup);
-    }
+
+        // 🔴 REQUIRED IN NODE
+        imageLayer.draw();
+    }   
 
     /* --------------------------------
        TEXT
