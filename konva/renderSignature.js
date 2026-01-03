@@ -107,7 +107,7 @@ export async function renderSignature({ elements }) {
     -------------------------------- */
 
     const BASE_WIDTH = 336;
-    const EXPORT_SCALE = 1.5;
+    const EXPORT_SCALE = 3;
 
     const signatureMeta = elements.find(el => el.key === "signatureName");
     const ratio =
@@ -299,7 +299,7 @@ export async function renderSignature({ elements }) {
         const qrGroup = await renderQRCode({
             x: qrField?.position?.x,
             y: qrField?.position?.y,
-            size: 80 * EXPORT_SCALE,
+            size: 50 * EXPORT_SCALE,
             value: qrField.link || "Link Missing!"
         });
 
