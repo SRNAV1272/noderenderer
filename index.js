@@ -183,7 +183,9 @@ app.post("/render-signature", async (req, res, next) => {
         let data = {};
         try {
             data = await saveRes.json();
-        } catch { }
+        } catch (err) {
+            next(new Error("Failed to parse save response JSON"));
+        }
 
         res.setHeader("Cache-Control", "no-store");
         res.json({
@@ -193,7 +195,7 @@ app.post("/render-signature", async (req, res, next) => {
         });
     } catch (err) {
         console.error("❌ Render failed:", err);
-        next(err);
+        next(new Error("Failed to render signature"));
     }
 });
 
