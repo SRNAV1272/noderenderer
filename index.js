@@ -107,10 +107,23 @@ async function encryptEmail(email = "") {
 /* --------------------------------------------------
    Fetch Signature (TIMEOUT SAFE)
 -------------------------------------------------- */
+async function fetchWithRetry(encryptedEmail, retries = 1) {
+    try {
+        console.log("🔁 trying signature fetch...");
+        return await fetchActiveSignature(encryptedEmail);
+    } catch (err) {
+        if (retries > 0 && err.message.includes("timeout")) {
+            console.warn("🔁 trying signature fetch...");
+            return fetchWithRetry(encryptedEmail, retries - 1);
+        }
+        throw err;
+    }
+}
+
 async function fetchActiveSignature(encryptedEmail) {
     const controller = new AbortController();
-    setTimeout(() => controller.abort(), 8000);
-
+    // setTimeout(() => controller.abort(), 10000);
+    console.log("✅ Fetched signature data for:", encryptedEmail)
     const res = await fetch(`${API_URL}/email-signature/outlook/get-active`, {
         method: "GET",
         headers: {
@@ -148,8 +161,9 @@ async function fetchActiveSignature(encryptedEmail) {
 app.post("/render-signature", async (req, res, next) => {
     try {
         const encryptedEmail = await encryptEmail(req?.body?.email);
-        const apiResponse = await fetchActiveSignature(encryptedEmail);
-
+        // const apiResponse = await fetchActiveSignature(encryptedEmail);
+        const apiResponse = await fetchWithRetry(encryptedEmail, 2);
+        console.log("✅ Fetched signature data for:", apiResponse)
         const elements = updateFieldsFromCard(
             apiResponse?.card,
             API_URL
