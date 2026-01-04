@@ -3,6 +3,7 @@ import { renderIcon } from "./icons/index.js";
 import { loadImage } from "./loadImage.js";
 import { renderQRCode } from "./qr/renderQrCode.js";
 import { createCanvas, Image } from "canvas";
+import crypto from "crypto";
 
 /* --------------------------------
    GLOBAL BACKGROUND RESIZE CACHE
@@ -54,8 +55,57 @@ function safeAddImage(layer, config) {
    Resize + Cache Background (OPTIMIZED)
 -------------------------------- */
 
-async function getResizedBackgroundFromImage(img, width, height, radius = 12) {
-    const cacheKey = `${img.src || "mem"}_${width}_${height}_${radius}`;
+// async function getResizedBackgroundFromImage(img, width, height, radius = 12) {
+//     const cacheKey = `${img.src || "mem"}_${width}_${height}_${radius}`;
+//     if (resizedBgCache.has(cacheKey)) {
+//         return resizedBgCache.get(cacheKey);
+//     }
+
+//     const canvas = createCanvas(width, height);
+//     const ctx = canvas.getContext("2d");
+
+//     // ✅ High quality scaling
+//     ctx.imageSmoothingEnabled = true;
+//     ctx.imageSmoothingQuality = "high";
+
+//     // --------------------------------------------------
+//     // 🔵 Rounded rectangle clip
+//     // --------------------------------------------------
+//     ctx.beginPath();
+//     ctx.moveTo(radius, 0);
+//     ctx.lineTo(width - radius, 0);
+//     ctx.quadraticCurveTo(width, 0, width, radius);
+//     ctx.lineTo(width, height - radius);
+//     ctx.quadraticCurveTo(width, height, width - radius, height);
+//     ctx.lineTo(radius, height);
+//     ctx.quadraticCurveTo(0, height, 0, height - radius);
+//     ctx.lineTo(0, radius);
+//     ctx.quadraticCurveTo(0, 0, radius, 0);
+//     ctx.closePath();
+
+//     ctx.clip();
+
+//     // --------------------------------------------------
+//     // 🖼 Draw image inside clipped area
+//     // --------------------------------------------------
+//     ctx.drawImage(img, 0, 0, width, height);
+
+//     const out = new Image();
+//     out.src = canvas.toBuffer("image/png");
+
+//     resizedBgCache.set(cacheKey, out);
+//     return out;
+// }
+async function getResizedBackgroundFromImage(
+    img,
+    imgHash,
+    src,
+    width,
+    height,
+    radius = 12
+) {
+    const cacheKey = `${src}_${imgHash}_${width}_${height}_${radius}`;
+
     if (resizedBgCache.has(cacheKey)) {
         return resizedBgCache.get(cacheKey);
     }
@@ -63,13 +113,9 @@ async function getResizedBackgroundFromImage(img, width, height, radius = 12) {
     const canvas = createCanvas(width, height);
     const ctx = canvas.getContext("2d");
 
-    // ✅ High quality scaling
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
 
-    // --------------------------------------------------
-    // 🔵 Rounded rectangle clip
-    // --------------------------------------------------
     ctx.beginPath();
     ctx.moveTo(radius, 0);
     ctx.lineTo(width - radius, 0);
@@ -81,19 +127,12 @@ async function getResizedBackgroundFromImage(img, width, height, radius = 12) {
     ctx.lineTo(0, radius);
     ctx.quadraticCurveTo(0, 0, radius, 0);
     ctx.closePath();
-
     ctx.clip();
 
-    // --------------------------------------------------
-    // 🖼 Draw image inside clipped area
-    // --------------------------------------------------
     ctx.drawImage(img, 0, 0, width, height);
 
-    const out = new Image();
-    out.src = canvas.toBuffer("image/png");
-
-    resizedBgCache.set(cacheKey, out);
-    return out;
+    resizedBgCache.set(cacheKey, canvas);
+    return canvas;
 }
 
 /* --------------------------------
@@ -107,7 +146,7 @@ export async function renderSignature({ elements }) {
     -------------------------------- */
 
     const BASE_WIDTH = 336;
-    const EXPORT_SCALE = 3;
+    const EXPORT_SCALE = 2;
 
     const signatureMeta = elements.find(el => el.key === "signatureName");
     const ratio =
@@ -150,14 +189,24 @@ export async function renderSignature({ elements }) {
         elements.map(async field => {
             if (!field.show) return;
 
-            if (
-                ["logo", "profilePhoto", "backgroundImage"].includes(field.key)
-            ) {
+            if (["logo", "profilePhoto", "backgroundImage"].includes(field.key)) {
                 const src = field.link || field.value;
                 if (!src) return;
 
                 const img = await loadImage(src);
-                if (img) imageCache.set(field.key, img);
+                if (!img) return;
+
+                // 🔑 Hash image content
+                const hash = crypto
+                    .createHash("sha1")
+                    .update(img.src)
+                    .digest("hex");
+
+                imageCache.set(field.key, {
+                    img,
+                    hash,
+                    src // 👈 IMPORTANT
+                });
             }
         })
     );
@@ -196,11 +245,13 @@ export async function renderSignature({ elements }) {
     -------------------------------- */
 
     const bgColor = elements.find(e => e.key === "backgroundColor");
-    const bgImg = imageCache.get("backgroundImage");
+    const bgEntry = imageCache.get("backgroundImage");
 
-    if (bgImg) {
+    if (bgEntry) {
         const resizedBg = await getResizedBackgroundFromImage(
-            bgImg,
+            bgEntry.img,
+            bgEntry.hash,
+            bgEntry.src,
             OUTPUT_WIDTH,
             OUTPUT_HEIGHT
         );
@@ -266,18 +317,18 @@ export async function renderSignature({ elements }) {
     }
 
     /* --------------------------------
-       IMAGES
-    -------------------------------- */
+   IMAGES (FIXED)
+-------------------------------- */
 
     for (const field of elements) {
         if (!field.show || !field.position) continue;
         if (!["logo", "profilePhoto"].includes(field.key)) continue;
 
-        const img = imageCache.get(field.key);
-        if (!img) continue;
+        const entry = imageCache.get(field.key);
+        if (!entry || !entry.img) continue;
 
         safeAddImage(imageLayer, {
-            image: img,
+            image: entry.img,   // ✅ REAL Image
             x: field.position.x,
             y: field.position.y,
             width: field.width,
@@ -299,7 +350,7 @@ export async function renderSignature({ elements }) {
         const qrGroup = await renderQRCode({
             x: qrField?.position?.x,
             y: qrField?.position?.y,
-            size: 50 * EXPORT_SCALE,
+            size: 70 * EXPORT_SCALE,
             value: qrField.link || "Link Missing!"
         });
 
@@ -309,7 +360,7 @@ export async function renderSignature({ elements }) {
 
         // 🔴 REQUIRED IN NODE
         imageLayer.draw();
-    }   
+    }
 
     /* --------------------------------
        TEXT
