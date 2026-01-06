@@ -309,7 +309,7 @@ export async function renderSignature({ elements }) {
         const qrGroup = await renderQRCode({
             x: qrField?.position?.x,
             y: qrField?.position?.y,
-            size: 70 * EXPORT_SCALE,
+            size: 70,
             value: qrField.link || "Link Missing!"
         });
 

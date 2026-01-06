@@ -122,38 +122,43 @@ async function fetchWithRetry(encryptedEmail, retries = 1) {
 }
 
 async function fetchActiveSignature(encryptedEmail) {
-    const controller = new AbortController();
-    // setTimeout(() => controller.abort(), 10000);
-    console.log("✅ Fetched signature data for:", encryptedEmail)
-    const res = await fetch(`${API_URL}/email-signature/outlook/get-active`, {
-        method: "GET",
-        headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-            username: encryptedEmail,
-        },
-        signal: controller.signal,
-    });
+    try {
 
-    if (!res.ok) {
-        throw new Error(`Signature API failed: ${res.status}`);
+        const controller = new AbortController();
+        // setTimeout(() => controller.abort(), 10000);
+        console.log("✅ Fetched signature data for:", encryptedEmail)
+        const res = await fetch(`${API_URL}/email-signature/outlook/get-active`, {
+            method: "GET",
+            headers: {
+                Accept: "application/json",
+                "Content-Type": "application/json",
+                username: encryptedEmail,
+            },
+            signal: controller.signal,
+        });
+
+        if (!res.ok) {
+            throw new Error(`Signature API failed: ${res.status}`);
+        }
+
+        const rawText = await res.text();
+
+        let encryptedPayload;
+        if (rawText.trim().startsWith("{")) {
+            encryptedPayload = JSON.parse(rawText)?.data;
+        } else {
+            encryptedPayload = rawText;
+        }
+
+        if (!encryptedPayload) {
+            throw new Error("Empty encrypted payload");
+        }
+
+        const decryptedText = await handleAesDecrypt(encryptedPayload);
+        return JSON.parse(decryptedText);
+    } catch (e) {
+        console.error("❌ Error in fetchActiveSignature:", e);
     }
-
-    const rawText = await res.text();
-
-    let encryptedPayload;
-    if (rawText.trim().startsWith("{")) {
-        encryptedPayload = JSON.parse(rawText)?.data;
-    } else {
-        encryptedPayload = rawText;
-    }
-
-    if (!encryptedPayload) {
-        throw new Error("Empty encrypted payload");
-    }
-
-    const decryptedText = await handleAesDecrypt(encryptedPayload);
-    return JSON.parse(decryptedText);
 }
 
 /* --------------------------------------------------
