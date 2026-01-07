@@ -258,7 +258,7 @@ app.post("/render-signature", async (req, res, next) => {
         });
     } catch (err) {
         console.error("❌ Render failed:", err);
-        next(new Error("Failed to render signature"));
+        next(new Error(err));
     }
 });
 
