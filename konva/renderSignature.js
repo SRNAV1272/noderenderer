@@ -358,12 +358,14 @@ export async function renderSignature({ elements }) {
             });
             if (iconNode) group.add(iconNode);
         }
-
+        const prefix =
+            field?.label && field.label !== "ICON"
+                ? `${field.label} : `
+                : "";
         const textNode = new Konva.Text({
             x: iconNode ? iconSize + 1 : 0,
             y: 0,
-            text: displayText,
-            text: `${!!field.label ? field.label + " : " : ""}${displayText}`,
+            text: `${prefix}${displayText}`,
             width: field.width * (field?.key === "addressLine1" ? 1 : 1.1),
             fontFamily: field.fontFamily || "Arial",
             fontStyle: resolveFontStyle(field),
