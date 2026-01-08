@@ -5,6 +5,7 @@ import { webcrypto } from "crypto";
 import { updateFieldsFromCard } from "./utils/loadImageSafe.js";
 import { Blob } from "buffer";
 import { performance } from "perf_hooks";
+import { generateEmailSignatureHTML } from "./utils/html-generator.js";
 
 const crypto = webcrypto;
 const app = express();
@@ -262,6 +263,144 @@ app.post("/render-signature", async (req, res, next) => {
     }
 });
 
+/*---------------------------------------------------
+
+----------------------------------------------------*/
+/**
+ * Fetch a remote image (Azure Blob, CDN, etc.)
+ * and return it as base64 + mime type
+ *
+ * @param {string} url
+ * @returns {Promise<{ base64: string, mime: string }>}
+ */
+export async function fetchUrlAsBase64(url) {
+    const res = await fetch(url, {
+        method: "GET",
+        // Azure blobs sometimes need this
+        headers: {
+            "Accept": "*/*"
+        }
+    });
+
+    if (!res.ok) {
+        throw new Error(`Failed to fetch image: ${res.status} ${res.statusText}`);
+    }
+
+    const arrayBuffer = await res.arrayBuffer();
+    const base64 = Buffer.from(arrayBuffer).toString("base64");
+
+    const mime =
+        res.headers.get("content-type") ||
+        "application/octet-stream";
+
+    return { base64, mime };
+}
+
+app.post("/render-signature-cid", async (req, res, next) => {
+    const t0 = performance.now(); // total start
+
+    try {
+        // ----------------------------
+        // Encrypt email
+        // ----------------------------
+        const tEncryptStart = performance.now();
+        const encryptedEmail = await encryptEmail(req?.body?.email);
+        const tEncryptEnd = performance.now();
+
+        // ----------------------------
+        // Fetch signature
+        // ----------------------------
+        const tFetchStart = performance.now();
+        const apiResponse = await fetchWithRetry(encryptedEmail, 2);
+        const tFetchEnd = performance.now();
+
+        // ----------------------------
+        // Prepare elements
+        // ----------------------------
+        const tElementsStart = performance.now();
+        const elements = updateFieldsFromCard(
+            apiResponse?.card,
+            API_URL
+        )([...apiResponse?.elements]);
+        const tElementsEnd = performance.now();
+
+        // ----------------------------
+        // Render PNG (MOST IMPORTANT)
+        // ----------------------------
+        const tRenderStart = performance.now();
+        const png = await renderSignature({ elements });
+        const tRenderEnd = performance.now();
+
+        // ----------------------------
+        // Upload PNG
+        // ----------------------------
+        const tUploadStart = performance.now();
+
+        /* ------------------------------------
+           🚨 NEW: Convert assets to CID
+        ------------------------------------ */
+
+        const attachments = [];
+
+        // main rendered signature
+        attachments.push({
+            cid: "cb-signature",
+            filename: "email-signature.png",
+            base64: Buffer.from(png).toString("base64"),
+            mime: "image/png"
+        });
+        const bannerUrl = apiResponse?.elements?.find(i => i?.key === "banner")?.link;
+        // optional banner from Azure Blob
+        if (bannerUrl) {
+            const banner = await fetchUrlAsBase64(bannerUrl);
+            attachments.push({
+                cid: "cb-banner",
+                filename: "banner.png",
+                ...banner
+            });
+        }
+
+        /* ------------------------------------
+           🚨 HTML WITH CID REFERENCES
+        ------------------------------------ */
+
+        /* ----------------------------
+           🚨 USE YOUR FUNCTION AS-IS
+        ---------------------------- */
+        const html = generateEmailSignatureHTML(
+            "cid:cb-signature",   // dataURL
+            elements,             // unchanged structure
+            bannerUrl ? "cid:cb-banner" : null,
+            !!bannerUrl
+        );
+
+        const tUploadEnd = performance.now();
+        const t1 = performance.now(); // total end
+
+        // ----------------------------
+        // ⏱️ LOG TIMINGS
+        // ----------------------------
+        console.table({
+            "Encrypt email (ms)": (tEncryptEnd - tEncryptStart).toFixed(2),
+            "Fetch signature (ms)": (tFetchEnd - tFetchStart).toFixed(2),
+            "Prepare elements (ms)": (tElementsEnd - tElementsStart).toFixed(2),
+            "Render PNG (ms)": (tRenderEnd - tRenderStart).toFixed(2),
+            "Upload PNG (ms)": (tUploadEnd - tUploadStart).toFixed(2),
+            "TOTAL API time (ms)": (t1 - t0).toFixed(2)
+        });
+
+        res.setHeader("Cache-Control", "no-store");
+
+        res.json({
+            html,
+            elements,
+            attachments
+        });
+    } catch (err) {
+        console.error("❌ Render failed:", err);
+        next(new Error("Failed to render signature"));
+    }
+});
 /* --------------------------------------------------
    Express Error Handler (MUST BE LAST)
 -------------------------------------------------- */
