@@ -359,7 +359,7 @@ export async function renderSignature({ elements }) {
             if (iconNode) group.add(iconNode);
         }
         const prefix =
-            field?.label && field.label !== "ICON"
+            field?.label && field.label !== "ICON" && field.label !== "Custom Text"
                 ? `${field.label} : `
                 : "";
         const textNode = new Konva.Text({
