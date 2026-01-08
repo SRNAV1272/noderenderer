@@ -362,8 +362,8 @@ export async function renderSignature({ elements }) {
         const textNode = new Konva.Text({
             x: iconNode ? iconSize + 1 : 0,
             y: 0,
-            text: displayText,
-            width: field.width * 1.1,
+            text: `${!!field.label ? field.label + " : " : ""}${displayText}`,
+            width: field.width * (field?.key === "addressLine1" ? 1 : 1.1),
             fontSize: field.fontSize * 0.82,
             fontFamily: field.fontFamily || "Arial",
             fontStyle: resolveFontStyle(field),
