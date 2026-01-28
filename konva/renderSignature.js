@@ -325,7 +325,6 @@ export async function renderSignature({ elements }) {
        TEXT
     -------------------------------- */
 
-
     for (const field of elements) {
         if (
             !field.show ||
@@ -359,16 +358,19 @@ export async function renderSignature({ elements }) {
             });
             if (iconNode) group.add(iconNode);
         }
+
         const prefix =
             field?.label && field.label !== "ICON" && field.label !== "Custom Text"
                 ? `${field.label} : `
                 : "";
+
         const textNode = new Konva.Text({
             x: iconNode ? iconSize + 1 : 0,
-            y: 1,
+            y: 0,
             text: `${prefix}${displayText}`,
-            width: field.width * (field?.key === "addressLine1" ? 1.05 : 1.1),
+            width: field.width * (field?.key === "addressLine1" ? 0.9 : 1.15),
             fontFamily: field.fontFamily || "Arial",
+            fontSize: field.fontSize * 0.83,
             fontStyle: resolveFontStyle(field),
             fill: field.color || "#000",
             align: resolveAlign(field),
@@ -377,40 +379,105 @@ export async function renderSignature({ elements }) {
         });
 
         group.add(textNode);
-        /* -------- ALIGNMENT OFFSET (KEY FIX) -------- */
+
+        /* -------- ALIGNMENT OFFSET (ICON + TEXT) -------- */
 
         if (iconNode) {
             const boxWidth = textNode.width();
             const glyphWidth = textNode.getTextWidth();
 
             let alignOffset = 0;
-
             if (field.align === "center") {
                 alignOffset = (boxWidth - glyphWidth) / 2;
             } else if (field.align === "right") {
                 alignOffset = boxWidth - glyphWidth;
             }
 
-            // 🔥 Both icon AND text need to be offset together
-            // Position icon at the start of visible text
             iconNode.x(alignOffset);
-            // Position text node so it starts after the icon
             textNode.x(alignOffset + iconSize + 1);
         }
 
-        /* -------- VERTICAL ALIGNMENT - ALIGN TO FIRST LINE -------- */
+        /* -------- VERTICAL ALIGNMENT (ICON) -------- */
 
         if (iconNode) {
-            // Get the font size to calculate first line height
             const fontSize = field.fontSize || 12;
-            const lineHeight = 1.1; // Same as text lineHeight
+            const lineHeight = 1.1;
             const firstLineHeight = fontSize * lineHeight;
-
-            // 🔥 FIXED: Align icon to center of FIRST LINE only, not entire text block
             iconNode.y((firstLineHeight - iconSize) / 2);
+        }
 
-            // OR if you want it exactly at the top (no vertical centering at all):
-            // iconNode.y(0);
+        /* -------- UNDERLINE (PATCH) -------- */
+
+        const textX = textNode.x();
+        const textY = textNode.y();
+        const fontSize = textNode.fontSize();
+        const lineHeightPx = fontSize * textNode.lineHeight();
+        
+        if (field?.fontDecorationLine?.split(" ")?.includes("underline"))
+            textNode.textArr.forEach((line, i) => {
+                if (!line.text) return;
+
+                let alignOffset = 0;
+                if (field.align === "center") {
+                    alignOffset = (textNode.width() - line.width) / 2;
+                } else if (field.align === "right") {
+                    alignOffset = textNode.width() - line.width;
+                }
+
+                const underlineY =
+                    textY + lineHeightPx * (i + 1) - fontSize * 0.15;
+
+                const underline = new Konva.Line({
+                    points: [
+                        textX + alignOffset,
+                        underlineY,
+                        textX + alignOffset + line.width,
+                        underlineY
+                    ],
+                    stroke: field.color || "#000",
+                    strokeWidth: Math.max(1, fontSize * 0.06)
+                });
+
+                group.add(underline);
+            });
+
+        /* -------- LINE-THROUGH (PATCH) -------- */
+
+        if (field?.fontDecorationLine?.split(" ")?.includes("line-through")) {
+            const textX = textNode.x();
+            const textY = textNode.y();
+            const fontSize = textNode.fontSize();
+            const lineHeightPx = fontSize * textNode.lineHeight();
+
+            textNode.textArr.forEach((line, i) => {
+                if (!line.text) return;
+
+                let alignOffset = 0;
+                if (field.align === "center") {
+                    alignOffset = (textNode.width() - line.width) / 2;
+                } else if (field.align === "right") {
+                    alignOffset = textNode.width() - line.width;
+                }
+
+                // 🔥 Middle of glyphs (strike position)
+                const strikeY =
+                    textY +
+                    lineHeightPx * i +
+                    fontSize * 0.55;
+
+                const strike = new Konva.Line({
+                    points: [
+                        textX + alignOffset,
+                        strikeY,
+                        textX + alignOffset + line.width,
+                        strikeY
+                    ],
+                    stroke: field.color || "#000",
+                    strokeWidth: Math.max(1, fontSize * 0.06)
+                });
+
+                group.add(strike);
+            });
         }
 
         textLayer.add(group);
