@@ -309,7 +309,7 @@ export async function renderSignature({ elements }) {
         const qrGroup = await renderQRCode({
             x: qrField?.position?.x,
             y: qrField?.position?.y,
-            size: 90,
+            size: 85,
             value: qrField.link || "Link Missing!"
         });
 
@@ -325,6 +325,7 @@ export async function renderSignature({ elements }) {
        TEXT
     -------------------------------- */
 
+    
     for (const field of elements) {
         if (
             !field.show ||
@@ -366,7 +367,7 @@ export async function renderSignature({ elements }) {
             x: iconNode ? iconSize + 1 : 0,
             y: 0,
             text: `${prefix}${displayText}`,
-            width: field.width * (field?.key === "addressLine1" ? 1 : 1.1),
+            width: field.width * (field?.key === "addressLine1" ? 1.05 : 1.1),
             fontFamily: field.fontFamily || "Arial",
             fontStyle: resolveFontStyle(field),
             fill: field.color || "#000",
@@ -390,15 +391,26 @@ export async function renderSignature({ elements }) {
                 alignOffset = boxWidth - glyphWidth;
             }
 
-            // 🔥 Icon sticks to visual text start
+            // 🔥 Both icon AND text need to be offset together
+            // Position icon at the start of visible text
             iconNode.x(alignOffset);
-            // textNode.x(alignOffset + iconSize);
+            // Position text node so it starts after the icon
+            textNode.x(alignOffset + iconSize + 1);
         }
 
-        /* -------- VERTICAL CENTER -------- */
+        /* -------- VERTICAL ALIGNMENT - ALIGN TO FIRST LINE -------- */
 
         if (iconNode) {
-            iconNode.y((textNode.height() - iconSize) / 2);
+            // Get the font size to calculate first line height
+            const fontSize = field.fontSize || 12;
+            const lineHeight = 1.1; // Same as text lineHeight
+            const firstLineHeight = fontSize * lineHeight;
+
+            // 🔥 FIXED: Align icon to center of FIRST LINE only, not entire text block
+            iconNode.y((firstLineHeight - iconSize) / 2);
+
+            // OR if you want it exactly at the top (no vertical centering at all):
+            // iconNode.y(0);
         }
 
         textLayer.add(group);
