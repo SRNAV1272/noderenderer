@@ -41,7 +41,7 @@ function getGroupedText(allFields, options, key) {
             return f?.show ? f.value : "";
         })
         .filter(Boolean)
-        .join(parent.separator || ", ");
+        .join(parent.separator?.trim() ? ` ${parent.separator?.trim()} ` : ",  ");
 }
 
 function safeAddImage(layer, config) {
@@ -325,7 +325,7 @@ export async function renderSignature({ elements }) {
        TEXT
     -------------------------------- */
 
-    
+
     for (const field of elements) {
         if (
             !field.show ||
@@ -365,7 +365,7 @@ export async function renderSignature({ elements }) {
                 : "";
         const textNode = new Konva.Text({
             x: iconNode ? iconSize + 1 : 0,
-            y: 0,
+            y: 1,
             text: `${prefix}${displayText}`,
             width: field.width * (field?.key === "addressLine1" ? 1.05 : 1.1),
             fontFamily: field.fontFamily || "Arial",
