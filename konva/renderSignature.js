@@ -181,6 +181,7 @@ export async function renderSignature({ elements }) {
     });
 
     const backgroundLayer = new Konva.Layer({ listening: false });
+
     const shapeLayer = new Konva.Layer({
         listening: false,
         scaleX: EXPORT_SCALE,
@@ -238,6 +239,28 @@ export async function renderSignature({ elements }) {
             })
         );
     }
+
+    /* --------------------------------
+   STAGE BORDER (FINAL – WORKING)
+-------------------------------- */
+
+    const BORDER_WIDTH = 2;
+    const BORDER_COLOR = "#d7caca";
+    const BORDER_RADIUS = 8;
+
+    backgroundLayer.add(
+        new Konva.Rect({
+            x: BORDER_WIDTH / 2,
+            y: BORDER_WIDTH / 2,
+            width: OUTPUT_WIDTH - BORDER_WIDTH,
+            height: OUTPUT_HEIGHT - BORDER_WIDTH,
+            stroke: BORDER_COLOR,
+            strokeWidth: BORDER_WIDTH,
+            cornerRadius: BORDER_RADIUS,
+            fillEnabled: false,
+            listening: false
+        })
+    );
 
     /* --------------------------------
        SHAPES
@@ -412,7 +435,7 @@ export async function renderSignature({ elements }) {
         const textY = textNode.y();
         const fontSize = textNode.fontSize();
         const lineHeightPx = fontSize * textNode.lineHeight();
-        
+
         if (field?.fontDecorationLine?.split(" ")?.includes("underline"))
             textNode.textArr.forEach((line, i) => {
                 if (!line.text) return;
