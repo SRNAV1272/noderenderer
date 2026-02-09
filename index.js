@@ -250,12 +250,18 @@ app.post("/render-signature", async (req, res, next) => {
             "Upload PNG (ms)": (tUploadEnd - tUploadStart).toFixed(2),
             "TOTAL API time (ms)": (t1 - t0).toFixed(2)
         });
-
+        const { emailSignatureUrl } = data;
+        const finalHtml = generateEmailSignatureHTML(
+            emailSignatureUrl === null ? "" : `${emailSignatureUrl}?v=${Date.now()}`,
+            elements,
+            banner === null ? "" : `${banner}?v=${Date.now()}`
+        );
         res.setHeader("Cache-Control", "no-store");
         res.json({
             ...data,
             bannerFileUrl: banner,
             elements,
+            finalHtml,
         });
     } catch (err) {
         console.error("❌ Render failed:", err);
