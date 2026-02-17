@@ -393,7 +393,7 @@ export async function renderSignature({ elements }) {
             text: `${prefix}${displayText}`,
             width: field.width * (field?.key === "addressLine1" ? 0.9 : 1.15),
             fontFamily: field.fontFamily || "Arial",
-            fontSize: field.fontSize * 0.83,
+            fontSize: field.fontSize * 0.89,
             fontStyle: resolveFontStyle(field),
             fill: field.color || "#000",
             align: resolveAlign(field),
