@@ -13,32 +13,32 @@ const app = express();
 /* --------------------------------------------------
    ✅ CORS
 -------------------------------------------------- */
-// app.use(
-//     cors({
-//         origin: "*",
-//         methods: ["GET", "POST", "OPTIONS"],
-//         allowedHeaders: ["Content-Type"],
-//     })
-// );
+app.use(
+    cors({
+        origin: "*",
+        methods: ["GET", "POST", "OPTIONS"],
+        allowedHeaders: ["Content-Type"],
+    })
+);
 /* --------------------------------------------------
    ✅ CORS - FIXED FOR OUTLOOK.LIVE.COM
 -------------------------------------------------- */
-app.use(
-    cors({
-        origin: [
-            "https://outlook.office.com",
-            "https://outlook.office365.com",
-            "https://outlook.live.com",  // ✅ ADD THIS - it's missing!
-            "https://localhost:3000",
-            "https://localhost:3001",
-            "app://*"  // Outlook desktop app
-        ],
-        methods: ["GET", "POST", "OPTIONS"],
-        allowedHeaders: ["Content-Type", "Accept"],
-        credentials: true,
-        optionsSuccessStatus: 200  // Some legacy browsers choke on 204
-    })
-);
+// app.use(
+//     cors({
+//         origin: [
+//             "*",
+//             "https://outlook.office.com",
+//             "https://outlook.office365.com",
+//             "https://outlook.live.com",  // ✅ ADD THIS - it's missing!
+//             "https://localhost:3000",
+//             "https://localhost:3001",
+//             "app://*"  // Outlook desktop app
+//         ],
+//         methods: ["GET", "POST", "OPTIONS"],
+//         allowedHeaders: ["Content-Type", "Accept"],
+//         optionsSuccessStatus: 200  // Some legacy browsers choke on 204
+//     })
+// );
 /* --------------------------------------------------
    Request Logging (Debug CORS)
 -------------------------------------------------- */
