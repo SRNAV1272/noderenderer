@@ -20,19 +20,41 @@ const app = express();
 //         allowedHeaders: ["Content-Type"],
 //     })
 // );
+/* --------------------------------------------------
+   ✅ CORS - FIXED FOR OUTLOOK.LIVE.COM
+-------------------------------------------------- */
 app.use(
     cors({
         origin: [
             "https://outlook.office.com",
             "https://outlook.office365.com",
-            "https://localhost:3000", // For local testing
+            "https://outlook.live.com",  // ✅ ADD THIS - it's missing!
+            "https://localhost:3000",
             "https://localhost:3001",
+            "app://*"  // Outlook desktop app
         ],
         methods: ["GET", "POST", "OPTIONS"],
-        allowedHeaders: ["Content-Type"],
-        credentials: true
+        allowedHeaders: ["Content-Type", "Accept"],
+        credentials: true,
+        optionsSuccessStatus: 200  // Some legacy browsers choke on 204
     })
 );
+/* --------------------------------------------------
+   Request Logging (Debug CORS)
+-------------------------------------------------- */
+app.use((req, res, next) => {
+    console.log(`📨 ${req.method} ${req.url}`);
+    console.log('   Origin:', req.headers.origin);
+    console.log('   Host:', req.headers.host);
+    console.log('   User-Agent:', req.headers['user-agent']?.substring(0, 50));
+
+    // Log all headers for OPTIONS requests (CORS preflight)
+    if (req.method === 'OPTIONS') {
+        console.log('   Preflight headers:', req.headers);
+    }
+
+    next();
+});
 
 /* --------------------------------------------------
    Body parser
