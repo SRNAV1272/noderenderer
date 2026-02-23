@@ -27,7 +27,6 @@ app.use(
             "https://outlook.office365.com",
             "https://localhost:3000", // For local testing
             "https://localhost:3001",
-            "app://0c7d84ec-2a2e-4f3b-8e1d-9a5b3c4d2e1f" // Your add-in ID
         ],
         methods: ["GET", "POST", "OPTIONS"],
         allowedHeaders: ["Content-Type"],
