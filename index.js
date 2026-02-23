@@ -25,15 +25,15 @@ app.use(
 -------------------------------------------------- */
 // app.use(
 //     cors({
-//         origin: [
-//             "*",
-//             "https://outlook.office.com",
-//             "https://outlook.office365.com",
-//             "https://outlook.live.com",  // ✅ ADD THIS - it's missing!
-//             "https://localhost:3000",
-//             "https://localhost:3001",
-//             "app://*"  // Outlook desktop app
-//         ],
+        // origin: [
+        //     "*",
+        //     "https://outlook.office.com",
+        //     "https://outlook.office365.com",
+        //     "https://outlook.live.com",  // ✅ ADD THIS - it's missing!
+        //     "https://localhost:3000",
+        //     "https://localhost:3001",
+        //     "app://*"  // Outlook desktop app
+        // ],
 //         methods: ["GET", "POST", "OPTIONS"],
 //         allowedHeaders: ["Content-Type", "Accept"],
 //         optionsSuccessStatus: 200  // Some legacy browsers choke on 204
